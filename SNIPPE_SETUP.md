@@ -23,6 +23,7 @@ Fungua project **mifumoyabiashara** kwenye Vercel → **Settings → Environment
 | `SNIPPE_API_KEY` | API Key ya Snippe yenye `collection:create` na `collection:read` |
 | `SNIPPE_WEBHOOK_SECRET` | Signing key kutoka Snippe → Webhook Secret |
 | `SITE_URL` | URL halisi ya HTTPS kwa environment husika bila slash ya mwisho |
+| `SNIPPE_PAYMENTS_ENABLED` | `false` hadi uthibitishaji wa mwisho ufanikiwe; badilisha `true` kuanza mauzo baada ya majaribio |
 
 Kwa branch `preview/ebook-functional`, mfano wa `SITE_URL` ni:
 
@@ -30,7 +31,7 @@ Kwa branch `preview/ebook-functional`, mfano wa `SITE_URL` ni:
 https://mifumoyabiashara-git-preview-ebook-functional-swaburs-projects.vercel.app
 ```
 
-Kwa **Production**, tumia domain inayosomeka kwenye Vercel → Project → Domains (si preview alias). Set `SITE_URL` tofauti kwa Preview na Production inapofaa.
+Kwa **Production**, tumia domain inayosomeka kwenye Vercel → Project → Domains (si preview alias). Set `SITE_URL` tofauti kwa Preview na Production inapofaa. **Webhook URL lazima iwe public**: ikiwa Preview inalindwa na Vercel Authentication, Snippe haitafikia callback. Tumia public Production URL wakati wa kupima miamala halisi.
 
 Taarifa hizi lazima ziwe **server-side environment variables**. `SNIPPE_API_KEY` na `SNIPPE_WEBHOOK_SECRET` zisionekane kwenye `public/`, HTML, JavaScript ya browser, au repo. Kubadili Vercel environment variables kunahitaji redeploy ili functions zitumie values mpya.
 
@@ -54,7 +55,8 @@ Kama webhook imechelewa, ukurasa wa mteja pia unaomba status kwa server. Server 
 2. Ingia kwenye `/admin.html`.
 3. Nenda **Mipangilio → Kagua Muunganisho wa Snippe**. Hiki kinafanya ombi la kusoma balance ya akaunti (**hakianzishi malipo**) na kurudisha matokeo bila kuonyesha salio wala API key.
 4. Hakikisha kitabu kina PDF na bei yake ni **TSh 25,000**.
-5. Fanya muamala wa kweli kwa ridhaa ya mlipaji. Thibitisha USSD, webhook/order kuwa `paid`, reader na PDF download. Usiwashe mauzo ya umma mpaka jaribio hili lifaulu.
+5. Kwa jaribio la mwisho la end-to-end, anza kwa kuhakikisha Snippe connection ipo na webhook inafikika kutoka mtandao bila Vercel login. Kwenye mazingira ya majaribio yanayodhibitiwa pekee, weka `SNIPPE_PAYMENTS_ENABLED=true` kwa muda na redeploy; fanya muamala halisi kwa ridhaa ya mlipaji. Hakikisha webhook, amount, order kuwa `paid`, reader na download zimefaulu.
+6. Zima flag tena (`false`) ukimaliza jaribio. Iwashe rasmi kwenye Production tu baada ya kuthibitisha matokeo yote. Kuongeza credentials pekee hakutawasha checkout.
 
 Kwa kutuma PDF access kwa email baada ya malipo, ongeza pia `RESEND_API_KEY` na `EMAIL_FROM` inayotoka kwenye verified sender domain; vinginevyo mnunuzi anapata access katika browser ya checkout lakini email link haiwezi kutumwa.
 
@@ -64,4 +66,5 @@ Kwa kutuma PDF access kwa email baada ya malipo, ongeza pia `RESEND_API_KEY` na 
 - Snippe idempotency key ina urefu usiozidi characters 30 na huzuia duplicate intents kwenye retries.
 - Server inahakiki amount, currency, reference na status. Event ya webhook pekee haipewi mamlaka ya kufungua PDF.
 - `ebook_payments.last_checked_at` inapunguza verification requests zinazorudiwa.
+- `SNIPPE_PAYMENTS_ENABLED=false` inazuia kuanzisha malipo mapya hata kama Snippe credentials zipo. Webhook na reconciliation huendelea kuthibitisha malipo yaliyowahi kuanzishwa ili yasipotee.
 - Hakuna `paid` state ya kubuni, hakuna transaction ya test kwenye live database.
