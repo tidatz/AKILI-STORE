@@ -1,7 +1,7 @@
 name: Verify eBook code
 on:
   push:
-    branches: [feat/ebook-sales, main]
+    branches: [feat/ebook-sales, main, 'preview/**']
   pull_request:
     branches: [main]
 jobs:
