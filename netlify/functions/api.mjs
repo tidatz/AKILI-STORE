@@ -160,6 +160,14 @@ async function handle(event){
   }
   if(action.startsWith('admin-')){
     await adminUser(event);
+    if(action==='admin-snippe-health'&&method==='GET'){
+      if(!process.env.SNIPPE_API_KEY || !process.env.SNIPPE_WEBHOOK_SECRET || !process.env.SITE_URL)
+        throw new HttpError(503,'SNIPPE_API_KEY, SNIPPE_WEBHOOK_SECRET na SITE_URL zinahitajika.');
+      const balance=await snippe('/payments/balance');
+      if(balance?.object!=='balance' || balance?.available?.currency!=='TZS')
+        throw new HttpError(502,'Snippe haijarudisha uthibitisho wa akaunti.');
+      return ok({connected:true,provider:'Snippe',currency:'TZS'});
+    }
     if(action==='admin-data'&&method==='GET'){
       const [books,settings,orders,payments,events]=await Promise.all([
         rows('ebook_books','select=*&order=created_at.desc'),
