@@ -184,6 +184,15 @@ function updateSales(){
   }
 }
 $('#sales-search').oninput=updateSales;
+$('#check-snippe').onclick=async()=>{
+  const output=$('#snippe-result'),button=$('#check-snippe');
+  output.hidden=false;output.textContent='Inahakiki Snippe API...';button.disabled=true;
+  try{
+    const status=await adminApi('snippe-health');
+    output.textContent=status.connected?'Snippe API imejibu kwa usahihi. Hakuna malipo yaliyoanzishwa.':'Muunganisho haujathibitishwa.';
+  }catch(error){output.textContent='Haijaunganishwa: '+error.message}
+  finally{button.disabled=false}
+};
 function updateSettings(){
   const container=$('#integration-status');container.replaceChildren();
   const statuses=[['Database / Private Storage','storage'],['Snippe API','snippe'],['Snippe Webhook Secret','webhook'],['Email Access (Resend)','email']];
