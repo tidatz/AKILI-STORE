@@ -39,6 +39,7 @@ function panel(which){
 }
 $('#admin-nav').onclick=e=>{const b=e.target.closest('button[data-panel]');if(b)panel(b.dataset.panel)};
 $('#logout').onclick=logout;
+$('#password-form').onsubmit=async e=>{e.preventDefault();const note=$('#password-note');note.hidden=true;try{const pass=e.target.elements.namedItem('password').value;if(pass.length<12)throw Error('Tumia herufi angalau 12.');const r=await fetch(config.supabase_url+'/auth/v1/user',{method:'PUT',headers:{apikey:config.publishable_key,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({password:pass})});if(!r.ok)throw Error('Password haijabadilishwa.');note.textContent='Password imebadilishwa. Ingia tena.';note.hidden=false;e.target.reset();logout();}catch(error){note.textContent=error.message;note.hidden=false}};
 $('#login-form').onsubmit=async e=>{
   e.preventDefault();clearError('#login-error');
   const form=e.target;const button=form.querySelector('button[type=submit]');button.disabled=true;
