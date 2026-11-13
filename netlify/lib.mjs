@@ -61,6 +61,7 @@ export async function snippe(path,options={}) {
   const key=process.env.SNIPPE_API_KEY;
   if(!key) throw new HttpError(503,'Snippe haijaunganishwa.');
   const response=await fetch('https://api.snippe.sh/v1'+path,{
+    signal:AbortSignal.timeout(12000),
     method:options.method||'GET',
     headers:{Authorization:'Bearer '+key,'Content-Type':'application/json',...(options.headers||{})},
     ...(options.body?{body:JSON.stringify(options.body)}:{})
@@ -91,7 +92,10 @@ export async function applyPayment(reference,orderId,eventId) {
   const verified=await snippe('/payments/'+encodeURIComponent(reference));
   const status=verified?.status;
   if(!['pending','completed','failed','expired','voided'].includes(status)) throw new HttpError(502,'Provider status haieleweki.');
-  if(Number(verified?.amount?.value)!==payment.amount_tzs||verified?.amount?.currency!=='TZS')
+  if(verified?.reference!==reference || (verified?.metadata?.order_id && verified.metadata.order_id!==orderId))
+    throw new HttpError(409,'Payment reference or order mismatch');
+  if(!Number.isSafeInteger(verified?.amount?.value) ||
+      verified.amount.value!==payment.amount_tzs || verified.amount.currency!=='TZS')
     throw new HttpError(409,'Amount mismatch');
   if(status==='pending') return 'pending';
   await supa('/rest/v1/rpc/ebook_apply_payment_event',{method:'POST',
