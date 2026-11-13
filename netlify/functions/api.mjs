@@ -195,7 +195,7 @@ async function handle(event){
       const ext=type.ext||({'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/x-icon':'ico'})[mime];
       const path=(bookId||'branding')+'/'+crypto.randomUUID()+'.'+ext;
       const response=await supa('/storage/v1/object/upload/sign/'+type.bucket+'/'+path,{method:'POST',body:{}});
-      const signed= response?.url?new URL(response.url,process.env.SUPABASE_URL).href:null;
+      const signed= response?.url?new URL('/storage/v1'+response.url,process.env.SUPABASE_URL).href:null;
       if(!signed)throw new HttpError(502,'Imeshindikana kuandaa upload.');
       return ok({path,url:signed,kind});
     }
