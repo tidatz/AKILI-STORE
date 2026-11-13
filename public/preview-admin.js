@@ -1,0 +1,35 @@
+// UI-ONLY preview. All changes are local to this page and never saved.
+const $=s=>document.querySelector(s);
+const banner=document.createElement('div');banner.className='preview-banner';
+banner.innerHTML='<strong>UI PREVIEW</strong><span>Admin UI tu · Hakuna data halisi inayobadilishwa</span><span><a href="/">Duka</a> · <a href="/admin.html">Admin</a> · <a href="/reader.html">Reader</a></span>';
+document.body.prepend(banner);
+$('#login-screen').hidden=true;$('#admin-screen').hidden=false;
+for(const b of document.querySelectorAll('#admin-nav button'))b.onclick=()=>{for(const x of document.querySelectorAll('#admin-nav button'))x.classList.toggle('active',x===b);for(const x of document.querySelectorAll('.panel'))x.hidden=x.id!=='panel-'+b.dataset.panel};
+const form=$('#book-form');
+const defaults={title:'Mifumo 7 Muhimu Kila Biashara Inayohitaji Ili Kufanikiwa',slug:'mifumo-7-muhimu',price_tzs:25000,status:'published',subtitle:'',description:''};
+for(const [k,v] of Object.entries(defaults))form.elements.namedItem(k).value=v;
+form.elements.namedItem('featured').checked=true;
+const list=$('#book-choices');
+const button=document.createElement('button');button.className='book-choice active';button.type='button';button.textContent=defaults.title+' · Published · Homepage';list.append(button);
+button.onclick=()=>{for(const[k,v]of Object.entries(defaults))form.elements.namedItem(k).value=v;$('#book-editor-title').textContent='Hariri Kitabu'};
+$('#delete-book').onclick=()=>alert('Preview: hakuna kitabu kinachofutwa.');
+$('#add-book').onclick=()=>{form.reset();form.elements.namedItem('price_tzs').value='';form.elements.namedItem('status').value='draft';$('#book-editor-title').textContent='Ongeza Kitabu'};
+form.onsubmit=e=>{e.preventDefault();alert('Preview: mabadiliko hayahifadhiwi kwenye database.')};
+$('#site-form').elements.namedItem('primary_color').value='#1d4ed8';
+$('#site-form').elements.namedItem('text_color').value='#121826';
+$('#site-form').elements.namedItem('buy_label').value='NUNUA SASA';
+for(const [k,v]of Object.entries({menu_about_book:'Kuhusu Kitabu',menu_about_author:'Kuhusu Mwandishi',menu_contents:'Yaliyomo',menu_contact:'Mawasiliano'}))$('#site-form').elements.namedItem(k).value=v;
+$('#site-form').onsubmit=e=>{e.preventDefault();alert('Preview: hakuna publish ya kweli.')};
+$('#preview-site').onclick=()=>{
+ const form=$('#site-form');const p=$('#preview-content');p.textContent='';
+ const header=document.createElement('h2');header.textContent=form.elements.namedItem('site_name').value||'eBook';
+ const title=document.createElement('p');title.textContent=$('#book-form').elements.namedItem('title').value;
+ const pay=document.createElement('button');pay.disabled=true;pay.className='primary-button';pay.textContent=form.elements.namedItem('buy_label').value||'NUNUA SASA';pay.style.background=form.elements.namedItem('primary_color').value;pay.style.borderColor=pay.style.background;
+ p.style.color=form.elements.namedItem('text_color').value;p.append(header,title,pay);$('#preview-box').hidden=false;
+};
+$('#integration-status').textContent='Snippe: haijaunganishwa · PDF: UI only · Email: UI only';
+$('#admin-email').textContent='Admin Preview (hakuna login halisi)';
+$('#sales-rows').innerHTML='<tr><td colspan="8">Hakuna mauzo halisi ya kuonyesha kwenye preview.</td></tr>';
+$('#logout').onclick=()=>alert('Preview UI only');
+$('#password-form').onsubmit=e=>{e.preventDefault();alert('Preview UI only')};
+for(const id of ['cover-file','pdf-file','logo-file','favicon-file'])$('#'+id).onchange=()=>alert('Upload ni ya UI preview tu.');
