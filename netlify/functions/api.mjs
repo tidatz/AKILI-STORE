@@ -64,11 +64,17 @@ async function handle(event){
     const existing=await one('ebook_payments',eq('order_id',order.id));
     if(existing)return ok({orderId:order.id,status:order.status,amount_tzs:order.amount_tzs});
     const words=order.customer_name.split(/\s+/);
+    let configuredUrl;
+    try {
+      configuredUrl=new URL(process.env.SITE_URL);
+      if(configuredUrl.protocol!=='https:' || configuredUrl.username || configuredUrl.password ||
+         configuredUrl.pathname!=='/' || configuredUrl.search || configuredUrl.hash) throw Error('Invalid URL');
+    }catch{throw new HttpError(503,'SITE_URL lazima iwe anwani ya HTTPS ya website.');}
     const result=await snippe('/payments',{method:'POST',
       headers:{'Idempotency-Key':'eb'+order.id.replace(/-/g,'').slice(0,25)},
       body:{payment_type:'mobile',details:{amount:order.amount_tzs,currency:'TZS'},
         phone_number:order.customer_phone,customer:{firstname:words[0],lastname:words.slice(1).join(' ')||words[0],email:order.customer_email},
-        webhook_url:process.env.SITE_URL.replace(/\/$/,'')+'/api?action=webhook',
+        webhook_url:configuredUrl.origin+'/api?action=webhook',
         metadata:{order_id:order.id}}});
     if(!result?.reference)throw new HttpError(502,'Payment reference haijarudi.');
     try{await insert('ebook_payments',{order_id:order.id,provider_reference:result.reference,
@@ -81,9 +87,36 @@ async function handle(event){
   }
   if(action==='status'&&method==='POST'){
     const b=json(event),order=await one('ebook_orders',eq('id',uuid(b.orderId)));
-    if(!order||order.checkout_secret_hash!==sha(String(b.clientSecret||'')))
+    if(!order||!(/^[0-9a-f]{64}$/.test(String(b.clientSecret||''))) ||
+        order.checkout_secret_hash!==sha(b.clientSecret))
       throw new HttpError(403,'Access haijaruhusiwa.');
-    return ok({status:order.status,amount_tzs:order.amount_tzs});
+    let status=order.status;
+    // A signed webhook is primary; this is a server-side reconciliation fallback.
+    // A conditional DB update limits repeated provider requests per order.
+    if(status==='pending' && process.env.SNIPPE_API_KEY){
+      const payment=await one('ebook_payments',eq('order_id',order.id));
+      if(payment?.status==='pending'){
+        const threshold=new Date(Date.now()-12000).toISOString();
+        const condition=eq('id',payment.id)+'&or=(last_checked_at.is.null,last_checked_at.lt.'+
+          encodeURIComponent(threshold)+')';
+        const reserved=await patch('ebook_payments',condition,{last_checked_at:new Date().toISOString()});
+        if(reserved?.length){
+          try {
+            const verified=await applyPayment(payment.provider_reference,order.id,'poll-'+randomToken().slice(0,32));
+            if(verified==='completed' && process.env.RESEND_API_KEY && process.env.EMAIL_FROM){
+              const paidOrder=await one('ebook_orders',eq('id',order.id));
+              await emailAccess(paidOrder);
+            }
+          } catch(error){
+            // An outage or pending API response must never invent a paid state.
+            console.error('Snippe verification unavailable',error?.status||'provider_error');
+          }
+        }
+      }
+      const current=await one('ebook_orders',eq('id',order.id),'status');
+      status=current?.status||'pending';
+    }
+    return ok({status,amount_tzs:order.amount_tzs});
   }
   if(action==='claim'&&method==='POST'){
     const b=json(event),order=await one('ebook_orders',eq('id',uuid(b.orderId)));
