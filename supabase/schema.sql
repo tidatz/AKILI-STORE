@@ -66,6 +66,8 @@ create table if not exists public.ebook_payments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Safe when installing this schema onto a previously existing store.
+alter table public.ebook_payments add column if not exists last_checked_at timestamptz;
 
 create table if not exists public.ebook_access_tokens (
   id uuid primary key default gen_random_uuid(),
