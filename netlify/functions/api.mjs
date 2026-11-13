@@ -159,6 +159,10 @@ async function handle(event){
       throw new HttpError(403,'Kiungo kimeisha au hakijaruhusiwa.');
     const order=await one('ebook_orders',eq('id',access.order_id));
     if(!order||order.status!=='paid')throw new HttpError(403,'Ununuzi haujathibitishwa.');
+    if(order.user_id){
+      const profile=await one('akili_profiles',eq('user_id',order.user_id),'status');
+      if(profile?.status==='restricted')throw new HttpError(403,'Akaunti hii imesitishwa. Wasiliana na msaada.');
+    }
     const book=await one('ebook_books',eq('id',order.book_id));
     if(!book?.pdf_path)throw new HttpError(404,'PDF haipo.');
     const isDownload=b.purpose==='download';

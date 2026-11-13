@@ -1,66 +1,46 @@
-# Minimal eBook Sales Website
+# AKILI STORE
 
-Single featured PDF today, multiple books supported later. Vanilla HTML/CSS/JS and one Netlify Function; Supabase Postgres, Auth and Storage; Snippe mobile money; optional Resend transactional emails. No marketplace, cart, testimonials or customer account requirements.
+A Kiswahili digital book marketplace operated by TIDA TZ COMPANY. The existing book, cover, private PDF and owner account are preserved. The storefront shows only published, real products; the admin can add more books.
 
-## Routes
-- `/` — featured book, buy, checkout and menu.
-- `/book/:slug` — sales page for any published book.
-- `/reader.html?token=...` — authorized PDF reader with page controls, zoom and download.
-- `/admin.html` — Books, Website Editor, Sales and Settings.
-- `/api?action=webhook` — Snippe signed webhook.
+## User journeys
 
-## Deploy with GitHub → Netlify
+- Reader: discover and search → book details → separate approved PDF sample → direct checkout → verified payment → personal library → protected reader with saved progress.
+- Author: admin invitation → verified email account → accept invitation → draft → upload cover, full private PDF and sample → submit → admin moderation → publish. Authors see only their own products, sales and balance.
+- Admin: overview, book editor and moderation, invitations and account restrictions, sales verification, withdrawal records, reviews, support replies, branding, integration status and audit history.
 
-1. Import this repository in Netlify and deploy the `main` branch after merging the implementation PR. Base directory: repository root. Publish directory: `public`. Functions directory: `netlify/functions`. The included `netlify.toml` configures these.
-2. In Supabase, run `supabase/schema.sql` on a project dedicated to the eBook store. This creates eight isolated `ebook_*` tables, locks them behind RLS (no browser table policies), creates the private `ebook-pdfs` and public `ebook-assets` buckets, and seeds the requested single book at **25,000 TZS**. Re-running seed inserts is harmless.
-3. In Netlify **Site configuration → Environment variables**, configure:
+There is no cart or subscription flow. AI, affiliate, course and audio features are future expansion; no simulated versions are presented as production features.
 
-| Name | Description |
-|---|---|
-| `SUPABASE_URL` | Supabase Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret server-side key; NEVER publish |
-| `SUPABASE_PUBLISHABLE_KEY` | Public Supabase key for Auth REST |
-| `SNIPPE_API_KEY` | Snippe live API key |
-| `SNIPPE_WEBHOOK_SECRET` | Snippe Settings → Webhook Secret; mandatory signature verification |
-| `SITE_URL` | Final HTTPS origin, no trailing slash |
-| `RESEND_API_KEY` | Email service for returning access links (optional until enabling email) |
-| `EMAIL_FROM` | Verified sender address, for example `Books <books@your-verified-domain>` |
+## Runtime and deployment
 
-**No real payments are allowed until Snippe API key, signing secret, valid SITE_URL and a PDF have been configured.** The frontend never displays fabricated payment success. The public publishable key is safe to expose; the service_role key is not.
+Vanilla HTML/CSS/JavaScript, Node API on Vercel, Supabase Auth/Postgres/private Storage. The Netlify adapter is retained. Vercel project: `mifumoyabiashara`, repository: `tidatz/AKILI-STORE`, production branch: `main`, public output: `public`. Install with `npm ci`. No frontend build step is required.
 
-4. Create an Admin user in **Supabase → Authentication → Users** with an email/password, then authorize their UUID only:
-   ```sql
-   insert into public.ebook_admins(user_id)
-   select id from auth.users where email='YOUR_ADMIN_EMAIL'
-   on conflict do nothing;
-   ```
-   Public registration is intentionally absent. Admin can change password after login. Admin login is checked server-side against `ebook_admins`, not client metadata.
-5. Open `/admin.html`. Upload the **final** PDF to the existing book, optionally upload its cover and logo, then save the book and publish branding changes. If Resend is configured, an email with a 30-day access link goes to the verified buyer. Immediately after payment, the original checkout browser can claim access securely using its own random secret.
+The original schema is `supabase/schema.sql`; `supabase/marketplace.sql` is the additive marketplace upgrade. Both have been applied to the connected store. Do not re-seed or reset a running database. All business tables use RLS with browser access revoked; authenticated API handlers validate the user, role, account status, ownership and purchase entitlement before reading or writing private records.
 
-### Payment lifecycle
+## Important routes
 
-Checkout reserves an order at the **database** price, uses a client-generated checkout UUID and 256-bit checkout secret, and sends Snippe an idempotency key of under 30 characters. The provider sends an HMAC-SHA256 webhook over the original raw JSON body, signed with `SNIPPE_WEBHOOK_SECRET`. The server validates signature and freshness, then independently calls `GET /v1/payments/{reference}`. A Postgres RPC marks the payment and order atomically after verifying reference, amount and currency. Repeated callbacks cannot grant duplicate purchases. PDFs are stored only in the private bucket and a paid order with valid access token gets a 15-minute signed read URL.
+- Public: `/`, `/books`, `/categories`, `/book/:slug`, `/help`, `/platform-policies`.
+- Accounts: `/login`, `/register`, `/forgot-password`, `/auth/callback`, `/profile-settings`.
+- Reader: `/reader-dashboard`, `/my-library`, `/order-history`, `/notifications`, `/reader.html?book=<id>`.
+- Author: `/author-dashboard`, `/author/books`, `/author/books/new`, `/author/books/:id/edit`, `/sales-analytics`, `/withdrawal-request`.
+- Admin: `/admin`, `/admin/books`, `/admin/users`, `/admin/orders`, `/admin/withdrawals`, `/admin/support`, `/admin/settings`.
+- Snippe callback: `/api?action=webhook`.
 
-PDF access tokens are bearer capabilities. Anyone holding a valid token can read that specific purchased book until expiration. Treat email access links as private; use HTTPS and avoid public forwarding. Storage-signed URLs may remain valid briefly after a token is revoked.
+The older paid access-token reader remains supported. Admin access is authorized through `ebook_admins`, never a frontend email comparison or user-editable metadata. The existing `tidatzacademy@gmail.com` account is already an admin. Its password is not changed by this upgrade.
 
-### Security / operational notes
+## Payment and finance controls
 
-- All business tables have RLS enabled, no `anon`/`authenticated` access, and writes go through server-side authorized endpoints.
-- PDF upload permission is granted only via signed upload URL after admin authorization. Images are public for storefront rendering.
-- Sales dashboard lists the 100 most recent orders; download counts measure **download requests**, not guaranteed completed transfer bytes.
-- A book with no uploaded PDF cannot initiate payment. A book with past sales cannot be deleted (unpublish instead).
-- If email delivery fails after the payment is confirmed, retrying the signed webhook can send it; Admin can also reissue a link. Without Resend, browser access works immediately after checkout, but email retrieval cannot operate.
-- For realistic payment testing, use a valid Snippe test or live account and provider callbacks. Never substitute fake paid statuses.
+Checkout uses the authenticated, confirmed buyer, database price and an idempotency key. Live payments remain disabled unless `SNIPPE_PAYMENTS_ENABLED=true` is explicitly set after a verified provider test. HMAC webhook verification and an independent provider lookup validate reference, amount, currency and status. One database transaction commits paid status, entitlement, allocation ledger and notification. Duplicate completion callbacks have no duplicate financial/access effects.
 
-## Tests
+Sale allocations use the existing 60% author / 30% platform / 10% operations policy. Withdrawal requests reserve balance under a database lock. Minimum request TSh 10,000; fee TSh 2,000. The admin records a payout reference only after actual payout outside the application; clicking a status button does not transfer money.
 
-```bash
-npm run check
-npm test
-```
+Full PDFs and sample PDFs use separate private buckets. Samples are validated before publication; the reader uses short-lived signed URLs and server-side access checks. Unpublished books stay available to existing entitled readers. Reviews require a purchase and admin moderation. Support and notifications use real saved records.
 
-Manual launch checks: mobile page, checkout validation and USSD, legitimate completed/failed webhook, duplicate webhook, access link on purchased book, rejected nonbuyer, PDF download, admin CRUD, site preview/publish, and multiple-book listing.
+## Environment and owner setup
 
-## Configuration still needed after code delivery
+Server variables: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `SITE_URL`. Snippe uses `SNIPPE_API_KEY`, `SNIPPE_WEBHOOK_SECRET`, `SNIPPE_PAYMENTS_ENABLED`. Optional returning access emails use `RESEND_API_KEY` and `EMAIL_FROM`. Never put server secrets in frontend files, Git or chat.
 
-The GitHub repository does not hold your **final PDF/cover**, Supabase secret key, Snippe credentials, or verified email sender. The Netlify GitHub connection and production end-to-end tests are deployment-time steps.
+See `OWNER_SETUP.md` for Google provider/redirect configuration and the final payment test. Supabase email confirmation and password recovery also require the correct Site URL and allowed callback. A configured email sender is needed for reliable high-volume transactional mail.
+
+## Validation
+
+`npm run check` and `npm test` cover syntax, signature verification, payment reconciliation, duplicate processing, role escalation, cross-author access, unconfirmed email and unpaid/revoked access. A database transaction test verifies entitlement/ledger idempotency and withdrawal reservations, then rolls back all test records. Passing these checks is not a claim that a live Snippe charge or Google OAuth round trip has been completed.

@@ -49,6 +49,19 @@ export async function validatePublication(b){
    throw new HttpError(400,'Kamilisha jina, mwandishi, kundi, bei, jalada, PDF na sampuli kabla ya kuchapisha.');
  const [cover,pdf,preview]=await Promise.all([existsFile('ebook-assets',b.cover_path),existsFile('ebook-pdfs',b.pdf_path),existsFile('ebook-previews',b.preview_path)]);
  if(!cover||!pdf||!preview)throw new HttpError(400,'Jalada, PDF au sampuli haijakamilika kupakiwa.');
+ const author=await one('akili_profiles',eq('user_id',b.author_id));
+ if(!author||author.status!=='active'||(author.role!=='author'&&!await one('ebook_admins',eq('user_id',b.author_id))))
+   throw new HttpError(400,'Mwandishi lazima awe na akaunti iliyoidhinishwa na inayofanya kazi.');
+ try {
+   const {PDFDocument}=await import('pdf-lib');
+   const [fullUrl,sampleUrl]=await Promise.all([signFile('ebook-pdfs',b.pdf_path,60),signFile('ebook-previews',b.preview_path,60)]);
+   const [fullResponse,sampleResponse]=await Promise.all([fetch(fullUrl,{signal:AbortSignal.timeout(20000)}),fetch(sampleUrl,{signal:AbortSignal.timeout(20000)})]);
+   if(!fullResponse.ok||!sampleResponse.ok)throw Error('download');
+   const [fullBytes,sampleBytes]=await Promise.all([fullResponse.arrayBuffer(),sampleResponse.arrayBuffer()]);
+   const [fullDoc,sampleDoc]=await Promise.all([PDFDocument.load(fullBytes),PDFDocument.load(sampleBytes)]);
+   if(sampleDoc.getPageCount()>4||sampleDoc.getPageCount()<1||sampleDoc.getPageCount()>=fullDoc.getPageCount())
+     throw new HttpError(400,'Sampuli iwe hadi kurasa nne na iwe fupi kuliko kitabu kamili.');
+ } catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'PDF au sampuli haifunguki vizuri. Hakikisha faili ni PDF halisi lisilofungwa kwa nenosiri.');}
 }
 const textFields=['slug','title','subtitle','description','author_name','category','language','cover_path','pdf_path','preview_path'];
 function bookValues(b){
@@ -130,7 +143,7 @@ export async function marketplace(event,action){
    authorizeAuthor(u);
    const [books,ledger,withdrawals,settings]=await Promise.all([rows('ebook_books','select=*&'+eq('author_id',u.id)+'&order=created_at.desc'),rows('akili_ledger','select=order_id,amount_tzs,created_at&account=eq.author&'+eq('author_id',u.id)+'&order=created_at.desc'),rows('akili_withdrawals','select=*&'+eq('user_id',u.id)+'&order=created_at.desc'),one('ebook_site_settings','id=eq.1','withdrawal_min_tzs,withdrawal_fee_tzs')]);
    const earned=ledger.reduce((s,x)=>s+x.amount_tzs,0),reserved=withdrawals.filter(x=>x.status!=='declined').reduce((s,x)=>s+x.amount_tzs,0);
-   return {books:books.map(x=>({...x,cover_url:assetUrl(x.cover_path)})),ledger,withdrawals,balance:{earned,available:earned-reserved,pending:withdrawals.filter(x=>x.status==='pending').reduce((s,x)=>s+x.amount_tzs,0),withdrawn:withdrawals.filter(x=>x.status==='paid').reduce((s,x)=>s+x.amount_tzs,0)},policy:settings};
+   return {books:books.map(x=>({...x,cover_url:assetUrl(x.cover_path)})),ledger,withdrawals,balance:{earned,available:earned-reserved,pending:withdrawals.filter(x=>x.status==='pending').reduce((s,x)=>s+x.amount_tzs,0),withdrawn:withdrawals.filter(x=>x.status==='paid').reduce((s,x)=>s+x.amount_tzs-x.fee_tzs,0)},policy:settings};
  }
  if(action==='market-save-book'&&method==='POST'){
    authorizeAuthor(u);const existing=b.id?await ownBook(u,b.id):null;
