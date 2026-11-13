@@ -32,6 +32,8 @@ async function handle(event){
       featured:featured?publishBook(featured):null,books:books.map(publishBook)});
   }
   if(action==='checkout'&&method==='POST'){
+    if(process.env.SNIPPE_PAYMENTS_ENABLED!=='true')
+      throw new HttpError(503,'Malipo hayajawashwa. Uthibitishaji wa mwisho bado unahitajika.');
     const b=json(event),bookId=uuid(b.bookId),checkoutId=uuid(b.checkoutId);
     const name=clean(b.name,120),email=clean(b.email,160).toLowerCase();
     let phone=clean(b.phone,25).replace(/[\s+\-()]/g,'');
@@ -166,7 +168,7 @@ async function handle(event){
       const balance=await snippe('/payments/balance');
       if(balance?.object!=='balance' || balance?.available?.currency!=='TZS')
         throw new HttpError(502,'Snippe haijarudisha uthibitisho wa akaunti.');
-      return ok({connected:true,provider:'Snippe',currency:'TZS'});
+      return ok({connected:true,provider:'Snippe',currency:'TZS',payments_enabled:process.env.SNIPPE_PAYMENTS_ENABLED==='true'});
     }
     if(action==='admin-data'&&method==='GET'){
       const [books,settings,orders,payments,events]=await Promise.all([
@@ -177,7 +179,7 @@ async function handle(event){
         rows('ebook_access_events','select=order_id,event_type,created_at&order=created_at.desc&limit=100')
       ]);
       return ok({books,settings,orders,payments,events,
-        status:{snippe:!!process.env.SNIPPE_API_KEY,webhook:!!process.env.SNIPPE_WEBHOOK_SECRET,
+        status:{snippe:!!process.env.SNIPPE_API_KEY,webhook:!!process.env.SNIPPE_WEBHOOK_SECRET,payments_enabled:process.env.SNIPPE_PAYMENTS_ENABLED==='true',
           email:!!(process.env.RESEND_API_KEY&&process.env.EMAIL_FROM),storage:!!process.env.SUPABASE_SERVICE_ROLE_KEY}});
     }
     const b=method==='POST'?json(event):{};
