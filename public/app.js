@@ -53,7 +53,13 @@ document.addEventListener('click',e=>{if(!$('#menu').hidden&&!e.target.closest('
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$('#'+b.dataset.close).close());
 for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close()});
 $('#buy').onclick=()=>{if(!book)return;$('#checkout-title').textContent=book.title;$('#checkout-price').textContent=money(book.price_tzs);
-  $('#checkout-error').hidden=true;$('#checkout-stage').hidden=false;$('#payment-stage').hidden=true;$('#checkout-modal').showModal()};
+  $('#checkout-error').hidden=true;$('#checkout-stage').hidden=false;$('#payment-stage').hidden=true;
+  try{const cached=JSON.parse(sessionStorage.getItem('ebook-checkout')||'null');
+    if(cached?.bookId===book.id&&cached?.orderId&&cached?.clientSecret){
+      purchase=cached;$('#checkout-stage').hidden=true;$('#payment-stage').hidden=false;
+      clearInterval(interval);interval=setInterval(checkPayment,5000);checkPayment();
+    }}catch{}
+  $('#checkout-modal').showModal()};
 const err=msg=>{$('#checkout-error').hidden=false;$('#checkout-error').textContent=msg};
 let purchase=null;
 async function checkPayment(){
@@ -63,9 +69,9 @@ async function checkPayment(){
     if(status.status==='paid'){
       clearInterval(interval);interval=null;$('#payment-message').textContent='Malipo yamethibitishwa. Tunafungua kitabu...';
       const access=await api('claim',{orderId:purchase.orderId,clientSecret:purchase.clientSecret});
-      sessionStorage.removeItem('ebook-checkout');location.href='/reader.html?token='+access.token;
+      sessionStorage.removeItem('ebook-checkout');sessionStorage.removeItem('ebook-attempt');location.href='/reader.html?token='+access.token;
     }else if(['failed','expired'].includes(status.status)){
-      clearInterval(interval);interval=null;$('#payment-message').textContent='Malipo hayajakamilika ('+status.status+').';
+      clearInterval(interval);interval=null;sessionStorage.removeItem('ebook-checkout');sessionStorage.removeItem('ebook-attempt');purchase=null;$('#payment-message').textContent='Malipo hayajakamilika ('+status.status+').';
     } else $('#payment-message').textContent='Tunasubiri uthibitisho kutoka Snippe. Thibitisha malipo kwenye simu yako.';
   }catch(e){err(e.message)}
 }
@@ -75,11 +81,16 @@ $('#checkout-form').onsubmit=async e=>{
   const data=Object.fromEntries(new FormData(e.currentTarget));
   const btn=$('#pay');btn.disabled=true;btn.textContent='INAANZISHA...';
   try{
-    const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
-    const clientSecret=Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('');
-    const checkoutId=crypto.randomUUID();
-    const result=await api('checkout',{...data,bookId:book.id,checkoutId,clientSecret});
-    purchase={orderId:result.orderId,clientSecret};
+    const fingerprint=JSON.stringify([book.id,data.name.trim(),data.email.trim().toLowerCase(),data.phone.replace(/[^0-9]/g,'')]);
+    let attempt;try{attempt=JSON.parse(sessionStorage.getItem('ebook-attempt')||'null')}catch{}
+    if(!attempt||attempt.fingerprint!==fingerprint||Date.now()-attempt.createdAt>4*60*60*1000){
+      const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
+      const clientSecret=Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('');
+      attempt={fingerprint,checkoutId:crypto.randomUUID(),clientSecret,createdAt:Date.now()};
+      sessionStorage.setItem('ebook-attempt',JSON.stringify(attempt));
+    }
+    const result=await api('checkout',{...data,bookId:book.id,checkoutId:attempt.checkoutId,clientSecret:attempt.clientSecret});
+    purchase={orderId:result.orderId,clientSecret:attempt.clientSecret,bookId:book.id};
     sessionStorage.setItem('ebook-checkout',JSON.stringify(purchase));
     $('#checkout-stage').hidden=true;$('#payment-stage').hidden=false;
     $('#payment-message').textContent='Ombi limetumwa. Kamilisha malipo kwenye simu yako.';
