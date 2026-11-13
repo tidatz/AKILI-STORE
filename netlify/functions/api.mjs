@@ -48,6 +48,10 @@ async function handle(event){
       if(order.checkout_secret_hash!==sha(b.clientSecret)||order.book_id!==bookId||
         order.customer_email!==email||order.customer_phone!==phone)throw new HttpError(409,'Checkout ID imetumika.');
     } else {
+      const limitSince=new Date(Date.now()-15*60*1000).toISOString();
+      const recent=await rows('ebook_orders','select=id&'+eq('customer_phone',phone)+
+        '&created_at=gte.'+encodeURIComponent(limitSince)+'&limit=3');
+      if(recent.length>=3)throw new HttpError(429,'Umefikia kikomo cha maombi ya malipo. Jaribu baada ya dakika 15.');
       try{
         const found=await insert('ebook_orders',{checkout_id:checkoutId,checkout_secret_hash:sha(b.clientSecret),
           book_id:bookId,customer_name:name,customer_email:email,customer_phone:phone,amount_tzs:book.price_tzs});
@@ -63,7 +67,7 @@ async function handle(event){
     const result=await snippe('/payments',{method:'POST',
       headers:{'Idempotency-Key':'eb'+order.id.replace(/-/g,'').slice(0,25)},
       body:{payment_type:'mobile',details:{amount:order.amount_tzs,currency:'TZS'},
-        phone_number:phone,customer:{firstname:words[0],lastname:words.slice(1).join(' ')||words[0],email},
+        phone_number:order.customer_phone,customer:{firstname:words[0],lastname:words.slice(1).join(' ')||words[0],email:order.customer_email},
         webhook_url:process.env.SITE_URL.replace(/\/$/,'')+'/api?action=webhook',
         metadata:{order_id:order.id}}});
     if(!result?.reference)throw new HttpError(502,'Payment reference haijarudi.');
