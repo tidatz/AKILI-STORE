@@ -26,3 +26,26 @@ test('GET /api?action=site fails safely if database secrets are missing',async()
   if(oldKey!==undefined)process.env.SUPABASE_SERVICE_ROLE_KEY=oldKey;
  }
 });
+
+test('Snippe checkout remains disabled with credentials until explicit activation',async()=>{
+ const old=process.env.SNIPPE_PAYMENTS_ENABLED;
+ const oldApi=process.env.SNIPPE_API_KEY;
+ const oldSecret=process.env.SNIPPE_WEBHOOK_SECRET;
+ const oldSite=process.env.SITE_URL;
+ try{
+  delete process.env.SNIPPE_PAYMENTS_ENABLED;
+  process.env.SNIPPE_API_KEY='fake-credential-for-test';
+  process.env.SNIPPE_WEBHOOK_SECRET='fake-webhook-secret';
+  process.env.SITE_URL='https://example.vercel.app';
+  const response=await app.fetch(new Request('https://example.vercel.app/api?action=checkout',{
+   method:'POST',headers:{'Content-Type':'application/json'},body:'{}'
+  }));
+  assert.equal(response.status,503);
+  const data=await response.json();
+  assert.match(data.error,/Malipo hayajawashwa/);
+ }finally{
+  const values={SNIPPE_PAYMENTS_ENABLED:old,SNIPPE_API_KEY:oldApi,
+   SNIPPE_WEBHOOK_SECRET:oldSecret,SITE_URL:oldSite};
+  for(const [key,value] of Object.entries(values)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+ }
+});
