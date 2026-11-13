@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="sw"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="no-referrer"><title>Soma Kitabu</title><link rel="stylesheet" href="/style.css"></head>
+<meta name="referrer" content="no-referrer"><title>Soma Kitabu</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/preview.css"></head>
 <body class="reader">
   <header class="reader-toolbar">
     <h1 id="reader-title">Kitabu</h1>
@@ -13,5 +13,10 @@
       </button></div>
   </header>
   <div class="pdf-stage" id="pdf-stage"><p id="reader-message" class="reader-message">Inafungua kitabu...</p><canvas id="page-canvas" hidden></canvas></div>
-  <script type="module" src="/reader.js"></script>
+  <script>
+const banner=document.createElement('div');banner.className='preview-banner';
+banner.innerHTML='<strong>UI PREVIEW</strong><span>PDF halisi haipo hapa — mnunuzi atalipia kwanza kwenye website halisi</span><span><a href="/">Duka</a> · <a href="/admin.html">Admin</a></span>';
+document.body.prepend(banner);
+document.getElementById('reader-message').textContent='Onyesho la PDF Reader. Page navigation, zoom na download vitafanya kazi baada ya malipo halisi na kupakia PDF.';
+</script>
 </body></html>
