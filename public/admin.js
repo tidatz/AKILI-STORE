@@ -189,7 +189,7 @@ $('#check-snippe').onclick=async()=>{
   output.hidden=false;output.textContent='Inahakiki Snippe API...';button.disabled=true;
   try{
     const status=await adminApi('snippe-health');
-    output.textContent=status.connected?'Snippe API imejibu kwa usahihi. Hakuna malipo yaliyoanzishwa.':'Muunganisho haujathibitishwa.';
+    output.textContent=status.connected?(status.payments_enabled?'Snippe imeunganishwa na malipo yamewezeshwa.':'Snippe API imeunganishwa, lakini malipo yamefungwa hadi verification ya mwisho.'):'Muunganisho haujathibitishwa.';
   }catch(error){output.textContent='Haijaunganishwa: '+error.message}
   finally{button.disabled=false}
 };
