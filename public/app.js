@@ -3,7 +3,7 @@ const api=async(action,body)=>{const r=await fetch('/api?action='+encodeURICompo
 const money=n=>'TSh '+Number(n).toLocaleString('en-US');
 let site,book,interval=null;
 const html=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const menuItems=[['Kuhusu Kitabu','about_book'],['Kuhusu Mwandishi','about_author'],['Yaliyomo','contents'],['Mawasiliano','contact']];
+const menuItems=[['Kuhusu Kitabu','about_book','menu_about_book'],['Kuhusu Mwandishi','about_author','menu_about_author'],['Yaliyomo','contents','menu_contents'],['Mawasiliano','contact','menu_contact']];
 function showInfo(title,value){$('#info-title').textContent=title;$('#info-content').textContent=value;$('#info-modal').showModal();$('#menu').hidden=true;$('#menu-button').setAttribute('aria-expanded','false')}
 function render(b){
   book=b;if(!b){$('#hero').hidden=true;$('#notice').hidden=false;$('#notice').textContent='Hakuna kitabu kilichochapishwa kwa sasa.';return}
@@ -15,7 +15,8 @@ function render(b){
   if(b.cover_url){const img=document.createElement('img');img.alt='Jalada la '+b.title;img.src=b.cover_url;cover.append(img);$('#cover-fallback').hidden=true}else $('#cover-fallback').hidden=false;
   document.title=b.title;
   const nav=$('#menu');nav.replaceChildren();
-  for(const [label,key] of menuItems){
+  for(const [defaultLabel,key,menuKey] of menuItems){
+    const label=site.settings[menuKey]||defaultLabel;
     const value=key==='about_book'?(b.description||site.settings.about_book):site.settings[key];
     if(!value?.trim())continue;
     const btn=document.createElement('button');btn.type='button';btn.textContent=label;btn.onclick=()=>showInfo(label,value);nav.append(btn);
