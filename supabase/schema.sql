@@ -62,9 +62,12 @@ create table if not exists public.ebook_payments (
   amount_tzs integer not null check(amount_tzs >= 500),
   currency text not null default 'TZS' check(currency='TZS'),
   status text not null default 'pending' check(status in ('pending','completed','failed','expired','voided')),
+  last_checked_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Safe when installing this schema onto a previously existing store.
+alter table public.ebook_payments add column if not exists last_checked_at timestamptz;
 
 create table if not exists public.ebook_access_tokens (
   id uuid primary key default gen_random_uuid(),
