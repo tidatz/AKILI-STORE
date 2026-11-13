@@ -63,7 +63,7 @@ async function handle(event){
     }
     const existing=await one('ebook_payments',eq('order_id',order.id));
     if(existing)return ok({orderId:order.id,status:order.status,amount_tzs:order.amount_tzs});
-    const words=name.split(/\s+/);
+    const words=order.customer_name.split(/\s+/);
     const result=await snippe('/payments',{method:'POST',
       headers:{'Idempotency-Key':'eb'+order.id.replace(/-/g,'').slice(0,25)},
       body:{payment_type:'mobile',details:{amount:order.amount_tzs,currency:'TZS'},
