@@ -1,0 +1,10 @@
+{
+  "name": "ebook-sales-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check netlify/lib.mjs && node --check netlify/functions/api.mjs && node --check public/app.js && node --check public/admin.js && node --check public/reader.js"
+  }
+}
