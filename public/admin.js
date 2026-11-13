@@ -69,7 +69,7 @@ function updateBooks(){
     const status=document.createElement('span');status.className='pill';status.textContent=b.status+(b.featured?' · Homepage':'');
     btn.append(title,status);btn.onclick=()=>bookSelect(b.id);container.append(btn);
   }
-  const b=data.books.find(x=>x.id===selectedId)||{id:'',title:'',slug:'',subtitle:'',price_tzs:25000,description:'',
+  const b=data.books.find(x=>x.id===selectedId)||{id:'',title:'',slug:'',subtitle:'',price_tzs:'',description:'',
     status:'draft',featured:false,cover_path:'',pdf_path:''};
   const form=$('#book-form');
   for(const name of ['id','title','slug','subtitle','description','price_tzs','status','cover_path','pdf_path'])form.elements.namedItem(name).value=b[name]??'';
