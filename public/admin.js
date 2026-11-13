@@ -59,7 +59,7 @@ async function refresh(){data=await adminApi('data');updateBooks();updateSite();
 function bookSelect(id){selectedId=id;updateBooks()}
 function updateBooks(){
   const container=$('#book-choices');container.replaceChildren();
-  if(selectedId&&!data.books.some(b=>b.id===selectedId))selectedId=null;
+  if(selectedId&&selectedId!=='new'&&!data.books.some(b=>b.id===selectedId))selectedId=null;
   if(!selectedId&&data.books.length)selectedId=data.books[0].id;
   for(const b of data.books){
     const btn=document.createElement('button');btn.className='book-choice'+(selectedId===b.id?' active':'');
