@@ -30,6 +30,10 @@ create table if not exists public.ebook_site_settings (
   about_author text not null default '',
   contents text not null default '',
   contact text not null default '',
+  menu_about_book text not null default 'Kuhusu Kitabu',
+  menu_about_author text not null default 'Kuhusu Mwandishi',
+  menu_contents text not null default 'Yaliyomo',
+  menu_contact text not null default 'Mawasiliano',
   published_at timestamptz not null default now()
 );
 
