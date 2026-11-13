@@ -45,7 +45,7 @@ export async function signFile(bucket,path,expiresIn=900) {
   const result=await supa('/storage/v1/object/sign/'+bucket+'/'+path.split('/').map(encodeURIComponent).join('/'),
     {method:'POST',body:{expiresIn}});
   if(!result?.signedURL) throw new HttpError(502,'PDF haipatikani kwa sasa.');
-  return new URL(result.signedURL,base().url).href;
+  return new URL('/storage/v1'+result.signedURL,base().url).href;
 }
 export async function adminUser(event) {
   const token=(event.headers.authorization||event.headers.Authorization||'').replace(/^Bearer\s+/i,'');
