@@ -1,11 +1,24 @@
 # AKILI STORE — final owner setup
 
+## Domain connection — required before final launch
+
+The new production site is available at https://ebook-sales-website-development.vercel.app/. The custom domain currently still reaches the old Base44 app. Vercel reports Invalid Configuration for both custom hostnames; authoritative DNS is at Namecheap, outside the connected Vercel zone.
+
+Update the existing website records in Namecheap Advanced DNS to the values Vercel returned for this project:
+
+| Type | Host | Value |
+|---|---|---|
+| A | @ | 216.198.79.1 |
+| CNAME | www | 3f409600a8f15249.vercel-dns-017.com. |
+
+Replace the conflicting website A/CNAME/redirect records for these two hosts. Preserve MX, email TXT and other unrelated records. After DNS propagation, refresh Vercel Domains and verify HTTPS on https://www.akilistore.com/. Merely attaching the domain in Vercel does not change Namecheap DNS.
+
 ## Google sign-in and email redirects
 
 Connected Supabase project: `rtowgcggjmtszziqgmux` (`supabase-indigo-ball`).
 
 1. In Supabase Authentication → URL Configuration, set Site URL to `https://www.akilistore.com`.
-2. Allow these exact callbacks: `https://www.akilistore.com/auth/callback` and `https://akilistore.com/auth/callback`. Keep any existing legitimate application redirects. For preview verification, add `https://mifumoyabiashara-git-feat-akili-marketplace-swaburs-projects.vercel.app/auth/callback` temporarily; remove it after verification.
+2. Allow these exact callbacks: `https://www.akilistore.com/auth/callback` and `https://akilistore.com/auth/callback`. Keep any existing legitimate application redirects. While the Vercel production URL is used, also allow `https://ebook-sales-website-development.vercel.app/auth/callback`. For preview verification, add `https://mifumoyabiashara-git-feat-akili-marketplace-swaburs-projects.vercel.app/auth/callback` temporarily; remove it after verification.
 3. Create/select the Google OAuth web client. Add `https://www.akilistore.com` as the authorized JavaScript origin. Authorized redirect URI: `https://rtowgcggjmtszziqgmux.supabase.co/auth/v1/callback`.
 4. Enter the Google client ID and secret directly in Supabase Authentication → Sign In / Providers → Google, then enable the provider. Do not share the secret in chat or source files.
 5. Verify registration, email confirmation/recovery and Google sign-in from the production domain. The Google button becomes available when Supabase reports the provider enabled. Verify the owner lands on `/admin` and a normal reader cannot open admin APIs.
