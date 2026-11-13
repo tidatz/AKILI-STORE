@@ -58,6 +58,10 @@
             <label>Logo<input id="logo-file" type="file" accept="image/png,image/jpeg,image/webp"></label>
             <label>Favicon<input id="favicon-file" type="file" accept="image/png,image/x-icon"></label>
           </div>
+          <label>Menu: Kuhusu Kitabu<input name="menu_about_book" maxlength="100"></label>
+          <label>Menu: Kuhusu Mwandishi<input name="menu_about_author" maxlength="100"></label>
+          <label>Menu: Yaliyomo<input name="menu_contents" maxlength="100"></label>
+          <label>Menu: Mawasiliano<input name="menu_contact" maxlength="100"></label>
           <label class="wide">Kuhusu Kitabu<textarea name="about_book" rows="3"></textarea></label>
           <label class="wide">Kuhusu Mwandishi<textarea name="about_author" rows="3"></textarea></label>
           <label class="wide">Yaliyomo<textarea name="contents" rows="3"></textarea></label>
@@ -82,7 +86,8 @@
         <h1>Mipangilio & Usalama</h1>
         <div class="admin-panel"><h2>Integration Status</h2><div id="integration-status"></div></div>
         <div class="admin-panel"><h2>Admin Account</h2><p id="admin-email"></p>
-          <button id="logout" class="secondary-button">Toka</button>
+          <form id="password-form" class="form-stack"><label>Password Mpya<input name="password" type="password" minlength="12" autocomplete="new-password" required></label><button class="secondary-button" type="submit">Badili Password</button></form>
+          <p id="password-note" role="status" hidden></p><div class="admin-actions"><button id="logout" class="secondary-button">Toka</button></div>
           <p class="muted">Password na permissions hubadilishwa kwenye Supabase Auth. Secrets huhifadhiwa kwenye environment variables, si kwenye website editor.</p>
         </div>
       </section>
