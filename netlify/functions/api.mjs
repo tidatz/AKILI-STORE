@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import {HttpError,sha,randomToken,isUuid,clean,supa,rows,insert,patch,remove,eq,one,assetUrl,signFile,adminUser,snippe,verifyWebhook,applyPayment,generateAccess,emailAccess} from '../lib.mjs';
+import {marketplace,currentUser,validatePublication} from '../marketplace.mjs';
 
 const ok=(data,status=200)=>({statusCode:status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
 const fail=(status,message)=>ok({error:message},status);
@@ -18,6 +19,8 @@ async function handle(event){
     const host=event.headers.host||event.headers.Host;
     if(origin&&host&&new URL(origin).host!==host)throw new HttpError(403,'Origin haijaruhusiwa.');
   }
+  const marketResult=await marketplace(event,action);
+  if(marketResult!==undefined)return ok(marketResult);
   if(action==='config'&&method==='GET')return ok({
     supabase_url:process.env.SUPABASE_URL||'',publishable_key:process.env.SUPABASE_PUBLISHABLE_KEY||''
   });
@@ -34,8 +37,11 @@ async function handle(event){
   if(action==='checkout'&&method==='POST'){
     if(process.env.SNIPPE_PAYMENTS_ENABLED!=='true')
       throw new HttpError(503,'Malipo hayajawashwa. Uthibitishaji wa mwisho bado unahitajika.');
+    const buyer=await currentUser(event);
     const b=json(event),bookId=uuid(b.bookId),checkoutId=uuid(b.checkoutId);
-    const name=clean(b.name,120),email=clean(b.email,160).toLowerCase();
+    const name=clean(b.name,120),email=buyer.email.toLowerCase();
+    const owned=await one('akili_entitlements',eq('user_id',buyer.id)+'&'+eq('book_id',bookId)+'&revoked_at=is.null');
+    if(owned)throw new HttpError(409,'Kitabu hiki tayari kipo kwenye maktaba yako.');
     let phone=clean(b.phone,25).replace(/[\s+\-()]/g,'');
     if(phone.startsWith('0'))phone='255'+phone.slice(1);
     if(!/^255\d{9}$/.test(phone)||!/^\S+@\S+\.\S+$/.test(email)||name.length<2||typeof b.clientSecret!=='string'||!/^[0-9a-f]{64}$/.test(b.clientSecret))
@@ -47,7 +53,7 @@ async function handle(event){
       throw new HttpError(409,'Kitabu bado hakijawa tayari kwa mauzo.');
     let order=await one('ebook_orders',eq('checkout_id',checkoutId));
     if(order){
-      if(order.checkout_secret_hash!==sha(b.clientSecret)||order.book_id!==bookId||
+      if(order.user_id!==buyer.id||order.checkout_secret_hash!==sha(b.clientSecret)||order.book_id!==bookId||
         order.customer_email!==email||order.customer_phone!==phone)throw new HttpError(409,'Checkout ID imetumika.');
     } else {
       const limitSince=new Date(Date.now()-15*60*1000).toISOString();
@@ -56,7 +62,7 @@ async function handle(event){
       if(recent.length>=3)throw new HttpError(429,'Umefikia kikomo cha maombi ya malipo. Jaribu baada ya dakika 15.');
       try{
         const found=await insert('ebook_orders',{checkout_id:checkoutId,checkout_secret_hash:sha(b.clientSecret),
-          book_id:bookId,customer_name:name,customer_email:email,customer_phone:phone,amount_tzs:book.price_tzs});
+          book_id:bookId,user_id:buyer.id,customer_name:name,customer_email:email,customer_phone:phone,amount_tzs:book.price_tzs});
         order=found[0];
       }catch(error){
         order=await one('ebook_orders',eq('checkout_id',checkoutId));
@@ -199,6 +205,10 @@ async function handle(event){
       if(values.pdf_path&&!/^[-\w/]+\.pdf$/.test(values.pdf_path))
         throw new HttpError(400,'PDF path si sahihi.');
       const id=b.id?uuid(b.id):crypto.randomUUID();
+      if(values.status==='published'){
+        const existing=b.id?await one('ebook_books',eq('id',id)):null;
+        await validatePublication({...existing,...values});
+      }
       if(values.featured){
         await patch('ebook_books','featured=eq.true',{featured:false});
       }

@@ -1,7 +1,10 @@
+import {api} from './auth.js';
 const $=s=>document.querySelector(s);
 const token=new URLSearchParams(location.search).get('token');
+const bookId=new URLSearchParams(location.search).get('book');
 const message=s=>{$('#reader-message').textContent=s;$('#reader-message').hidden=false};
 const request=async purpose=>{
+  if(bookId)return api('market-access',{bookId,purpose});
   const response=await fetch('/api?action=access',{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify({token,purpose})});
   const data=await response.json();
@@ -38,7 +41,9 @@ async function render(){
   try{await paint.promise;}catch(e){if(e?.name!=='RenderingCancelledException')message('Imeshindikana kuonyesha ukurasa.')}
   if(renderId===desiredRender)paint=null;
   updateButtons();
+  if(bookId){clearTimeout(saveTimer);saveTimer=setTimeout(()=>api('market-progress',{bookId,page,total_pages:pdf.numPages}).catch(()=>{}),1000);}
 }
+let saveTimer;
 $('#prev').onclick=()=>{if(page>1){page--;render()}};
 $('#next').onclick=()=>{if(pdf&&page<pdf.numPages){page++;render()}};
 $('#zoom-in').onclick=()=>{zoom=Math.min(2.5,Math.round((zoom+.25)*100)/100);render()};
@@ -57,14 +62,18 @@ $('#download').onclick=async()=>{
   finally{updateButtons()}
 };
 let resize;window.addEventListener('resize',()=>{clearTimeout(resize);resize=setTimeout(render,200)});
-(async()=>{
-  if(!/^[a-f0-9]{64}$/.test(token||'')){message('Kiungo cha kitabu hakipo au si sahihi.');return}
+async function openBook(){
+  $('#retry-reader').hidden=true;
+  if(!bookId&&!/^[a-f0-9]{64}$/.test(token||'')){message('Kiungo cha kitabu hakipo au si sahihi.');return}
   try{
     details=await request('read');
     $('#reader-title').textContent=details.title;document.title=details.title;
     const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs');
     pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
     pdf=await pdfjs.getDocument({url:details.url}).promise;
+    if(bookId)page=Math.min(pdf.numPages,Math.max(1,details.page||1));
     updateButtons();await render();
-  }catch(e){message(e.message||'Imeshindikana kufungua PDF.')}
-})();
+  }catch(e){message(e.message||'Imeshindikana kufungua PDF.');$('#retry-reader').hidden=false;}
+}
+$('#retry-reader').onclick=openBook;
+openBook();
