@@ -1,0 +1,13 @@
+{
+  "name": "akili-store",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check netlify/lib.mjs && node --check netlify/marketplace.mjs && node --check netlify/functions/api.mjs && node --check public/market.js && node --check public/auth.js && node --check public/icons.js && node --check public/reader.js && node --check api/index.js"
+  },
+  "dependencies": {
+    "pdf-lib": "1.17.1"
+  }
+}
