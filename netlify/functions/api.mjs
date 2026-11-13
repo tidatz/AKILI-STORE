@@ -7,7 +7,7 @@ const json=event=>{if((event.body||'').length>30000)throw new HttpError(413,'Dat
 const uuid=id=>{if(!isUuid(id))throw new HttpError(400,'ID si sahihi.');return id};
 const publishBook=b=>({id:b.id,slug:b.slug,title:b.title,subtitle:b.subtitle,description:b.description,price_tzs:b.price_tzs,cover_url:assetUrl(b.cover_path)});
 const bookFields=['slug','title','subtitle','description','price_tzs','status','featured','cover_path','pdf_path'];
-const siteFields=['site_name','logo_path','favicon_path','primary_color','text_color','font_style','buy_label','about_book','about_author','contents','contact'];
+const siteFields=['site_name','logo_path','favicon_path','primary_color','text_color','font_style','buy_label','about_book','about_author','contents','contact','menu_about_book','menu_about_author','menu_contents','menu_contact'];
 
 async function handle(event){
   const method=event.httpMethod;
@@ -172,7 +172,7 @@ async function handle(event){
       const v=Object.fromEntries(siteFields.filter(k=>Object.hasOwn(b,k)).map(k=>[k,b[k]]));
       if(!/^#[0-9a-fA-F]{6}$/.test(v.primary_color)||!/^#[0-9a-fA-F]{6}$/.test(v.text_color)
         ||!['serif','system'].includes(v.font_style))throw new HttpError(400,'Colors au font si sahihi.');
-      for(const k of ['site_name','buy_label'])v[k]=clean(v[k],100);
+      for(const k of ['site_name','buy_label','menu_about_book','menu_about_author','menu_contents','menu_contact'])v[k]=clean(v[k],100);
       for(const k of ['about_book','about_author','contents','contact'])v[k]=clean(v[k],12000);
       for(const k of ['logo_path','favicon_path'])
         if(v[k]&&!/^[-\w/]+\.(png|jpg|jpeg|webp|ico)$/.test(v[k]))
