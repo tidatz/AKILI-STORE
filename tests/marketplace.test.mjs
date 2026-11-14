@@ -13,7 +13,7 @@ async function mock(role,callback,overrides={}){
  global.fetch=async(url,opts={})=>{url=new URL(url);calls.push({path:url.pathname,query:url.search,opts});let result;
   if(overrides[url.pathname])result=await overrides[url.pathname](url,opts);
   else if(url.pathname==='/auth/v1/user')result={id:uid,email:'qa@example.invalid',email_confirmed_at:new Date().toISOString(),user_metadata:{role:'admin'}};
-  else if(url.pathname==='/rest/v1/akili_profiles')result=[{user_id:uid,display_name:'QA',role,status:'active'}];
+  else if(url.pathname==='/rest/v1/akili_profiles')result=[{user_id:uid,display_name:'QA',email:'qa@example.invalid',role,status:'active'}];
   else if(url.pathname==='/rest/v1/ebook_admins')result=[];
   else if(url.pathname==='/rest/v1/ebook_books')result=[{id:bookId,author_id:other,title:'Existing book',slug:'existing-book',price_tzs:25000,status:'draft',pdf_path:'private/full.pdf',preview_path:'sample.pdf',cover_path:'cover.png'}];
   else if(url.pathname==='/rest/v1/ebook_site_settings')result=[{site_name:'AKILI STORE'}];
@@ -30,3 +30,13 @@ test('unpaid reader cannot obtain a protected file or write reading progress',as
 test('public catalog does not disclose private content paths',async()=>mock('reader',async()=>{const r=await request('catalog',null,null);assert.equal(r.status,200);const text=await r.text();assert.equal(text.includes('private/full.pdf'),false);assert.equal(text.includes('sample.pdf'),false);assert.equal(text.includes('server-test'),false);}));
 test('auth user must have a confirmed email before library binding',async()=>mock('reader',async()=>{assert.equal((await request('market-library')).status,403);},{'/auth/v1/user':()=>({id:uid,email:'qa@example.invalid',email_confirmed_at:null})}));
 test('revoked or non-paid entitlement never signs the full PDF',async()=>mock('reader',async calls=>{assert.equal((await request('market-access',{bookId})).status,403);assert.equal(calls.some(c=>c.path.startsWith('/storage')),false);},{'/rest/v1/akili_entitlements':()=>[{user_id:uid,book_id:bookId,order_id:other}],'/rest/v1/ebook_orders':()=>[{id:other,user_id:uid,status:'pending'}]}));
+test('a verified reader can see and explicitly accept an invitation for their own email',async()=>mock('reader',async calls=>{
+ const me=await (await request('market-me')).json();assert.equal(me.user.author_invitation,other);assert.equal(me.user.role,'reader');
+ assert.equal((await request('market-accept-email-invite',{id:other})).status,200);
+ const rpc=calls.find(c=>c.path==='/rest/v1/rpc/akili_accept_invitation');assert.ok(rpc);assert.equal(JSON.parse(rpc.opts.body).p_user_id,uid);
+},{'/rest/v1/akili_author_invitations':()=>[{id:other,email:'qa@example.invalid',token_hash:'test-hash',accepted_at:null,expires_at:'2099-01-01'}]}));
+test('a verified reader cannot claim another email invitation or an expired invitation',async()=>{
+ for(const invite of [{email:'someone-else@example.invalid',expires_at:'2099-01-01'},{email:'qa@example.invalid',expires_at:'2000-01-01'}])await mock('reader',async calls=>{
+  assert.equal((await request('market-accept-email-invite',{id:other})).status,403);assert.equal(calls.some(c=>c.path.includes('/rpc/')),false);
+ },{'/rest/v1/akili_author_invitations':()=>[{id:other,token_hash:'test-hash',accepted_at:null,...invite}]});
+});
