@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {HttpError,clean,isUuid,sha,randomToken,supa,rows,one,insert,patch,eq,assetUrl,signFile,adminUser} from './lib.mjs';
-import {smsConfigured,emailConfigured,invitationEmailConfigured,bulkValues,sendBulk,smsAccount,emailInvitation,siteOrigin} from './communications.mjs';
+import {smsConfigured,emailConfigured,invitationEmailConfigured,bulkValues,sendBulk,smsAccount,connectSmsApi,connectSmsWebhook,emailInvitation,siteOrigin} from './communications.mjs';
+import {smsConfig,smsStatus} from './sms-config.mjs';
 
 const uuid=value=>{if(!isUuid(value))throw new HttpError(400,'Kitambulisho si sahihi.');return value;};
 const body=event=>{if((event.body||'').length>40000)throw new HttpError(413,'Taarifa ni nyingi.');try{return JSON.parse(event.body||'{}');}catch{throw new HttpError(400,'Taarifa si sahihi.');}};
@@ -228,9 +229,15 @@ export async function marketplace(event,action){
  if(action==='market-admin-sms-data'&&method==='GET'){
    const campaigns=await rows('akili_sms_campaigns','select=*&order=created_at.desc&limit=60');
    const totals=campaigns.length?await rows('akili_sms_delivery_totals','select=*&campaign_id=in.('+campaigns.map(c=>c.id).join(',')+')'):[];
-   return {configured:smsConfigured(),campaigns:campaigns.map(({recipients,fingerprint,...c})=>({...c,recipient_count:recipients.length,delivered:totals.find(t=>t.campaign_id===c.id)?.delivered||0,failed:totals.find(t=>t.campaign_id===c.id)?.failed||0}))};
+   return {...smsStatus(await smsConfig()),campaigns:campaigns.map(({recipients,fingerprint,...c})=>({...c,recipient_count:recipients.length,delivered:totals.find(t=>t.campaign_id===c.id)?.delivered||0,failed:totals.find(t=>t.campaign_id===c.id)?.failed||0}))};
  }
- if(action==='market-admin-sms-preview'&&method==='POST')return {...bulkValues(b),configured:smsConfigured()};
+ if(action==='market-admin-sms-connect'&&method==='POST'){
+   const result=await connectSmsApi(u,b);await audit(u,'sms.api_configured',u.id);return result;
+ }
+ if(action==='market-admin-sms-webhook'&&method==='POST'){
+   const result=await connectSmsWebhook(u,b);await audit(u,'sms.webhook_configured',u.id);return result;
+ }
+ if(action==='market-admin-sms-preview'&&method==='POST')return {...bulkValues(b),configured:await smsConfigured()};
  if(action==='market-admin-sms-account'&&method==='GET')return smsAccount();
  if(action==='market-admin-sms-send'&&method==='POST'){
    const result=await sendBulk(u,b);await audit(u,'sms.submitted',result.campaign.id,{recipients:result.campaign.recipients.length});return {accepted:result.campaign.status==='accepted'};

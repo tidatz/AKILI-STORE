@@ -34,7 +34,7 @@ The existing verified owner `tidatzacademy@gmail.com` has the admin database per
 
 ## Snippe
 
-In Vercel project `mifumoyabiashara`, Production config variables `SITE_URL=https://www.akilistore.com` and `SNIPPE_PAYMENTS_ENABLED=false` have been saved. They apply to the next production deployment. Snippe API credentials have not been configured and live payments remain disabled.
+In Vercel project `mifumoyabiashara`, Production config variables `SITE_URL=https://www.akilistore.com` and `SNIPPE_PAYMENTS_ENABLED=false` have been saved. The `SNIPPE_API_KEY` and `SNIPPE_WEBHOOK_SECRET` variable names are now present; their values were not revealed and their connection has not yet been verified. Live payments remain disabled.
 
 1. Add server-only `SNIPPE_API_KEY` and `SNIPPE_WEBHOOK_SECRET` directly in Vercel as Secret variables, scoped to Production. Never paste these values into chat or commit them. Redeploy after saving. Keep `SNIPPE_PAYMENTS_ENABLED=false` during connection verification.
 2. Set Snippe callback to `https://www.akilistore.com/api?action=webhook` and register the correct signing secret.
@@ -54,4 +54,4 @@ Supabase Auth handles registration and recovery email separately; verify its sen
 
 ## Bulk SMS
 
-See [EHUB_SETUP.md](EHUB_SETUP.md). The SMS admin page, signed API client, protected campaign records and delivery webhook are implemented. Provider credentials, an approved sender ID, the webhook registration and a controlled live delivery check are still required. No real messages have been sent during development.
+See [EHUB_SETUP.md](EHUB_SETUP.md). Admin → Ujumbe wa SMS now includes mobile forms for API key/secret and webhook signing secret. Server-side sender discovery removes the UUID entry step; credentials are encrypted in Supabase Vault with server-only RPC access. The eHub account already has an approved **AKILI STORE** sender and an active key with that name. The owner must still enter the existing credentials, register the webhook and complete a controlled delivery check. No real messages have been sent during development.

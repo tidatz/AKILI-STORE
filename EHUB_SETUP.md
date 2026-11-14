@@ -1,8 +1,16 @@
 # eHub SMS — AKILI STORE
 
-API contract reviewed against https://sms.ehub.co.tz/api-docs. The linked developer documentation requires a signed Bearer request. API keys are never placed in browser code, SQL tables or Git.
+API contract reviewed against https://sms.ehub.co.tz/api-docs. The linked developer documentation requires a signed Bearer request. Credentials are never bundled in browser code, returned by admin APIs, logged in audit details or committed to Git.
 
-## Production variables
+## Mobile setup
+
+Open https://www.akilistore.com/admin/messages and sign in as the owner. In **Unganisha eHub**, enter the existing API key and its matching API secret, then select **Hifadhi na hakiki**. The server looks up the approved **AKILI STORE** sender UUID and checks the wallet without sending an SMS. The account's approved sender was observed in eHub; no new sender or API key was created.
+
+The next form shows the webhook URL below. Enable it in eHub and enter its signing secret in the admin form. Use eHub's test event to verify the callback, then agree one owner-phone test message before any campaign.
+
+These credentials are encrypted at rest in Supabase Vault under the fixed `akili_store_ehub` entry. The two `akili_ehub_config_*` RPCs are SECURITY INVOKER with execution revoked from PUBLIC, anon and authenticated; only the existing server service role can call them. The save RPC also requires an existing admin actor. API key replacement keeps the webhook secret only when the sender UUID is unchanged. No browser role receives Vault access. Fields are blank on every page load and cleared after saving. No redeployment is needed for this path.
+
+## Alternative: Production variables
 
 Save these directly in Vercel project `mifumoyabiashara` → Environment Variables, scoped to Production, as Secret values:
 
@@ -13,6 +21,8 @@ Save these directly in Vercel project `mifumoyabiashara` → Environment Variabl
 | `EHUB_SENDER_ID` | UUID of an approved sender, not its display name |
 | `EHUB_WEBHOOK_SECRET` | Developer → Webhook signing secret |
 
+A complete API key/secret/sender environment configuration takes precedence over Vault and hides the mobile replacement forms, preventing two conflicting configurations.
+
 Configure the delivery-report endpoint in eHub:
 
 `https://www.akilistore.com/api?action=sms-webhook`
@@ -21,7 +31,7 @@ Keep `EHUB_TRANSACTIONAL_SMS_ENABLED=false` until the sender and a controlled de
 
 ## Verification
 
-1. Redeploy after saving the variables. In Admin → Ujumbe wa SMS, use **Angalia salio** to verify the API signature, sender approval and account connection. This sends no SMS.
+1. Redeploy only if using environment variables. In Admin → Ujumbe wa SMS, use **Angalia salio** to verify the API signature, sender approval and account connection. This sends no SMS.
 2. eHub Developer → Webhook → Send a test event should receive HTTP 200. Wrong or missing HMAC signatures must fail.
 3. Submit one agreed test message to the owner's own phone. Verify its provider message ID, actual cost and delivery report before a larger campaign.
 4. Use the preview to check recipient count and exact message text before confirming a bulk send. Maximum: 1,000 recipients and 640 characters. Duplicate phone numbers are sent once.
