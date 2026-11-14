@@ -10,7 +10,7 @@ const requestId='55555555-5555-4555-8555-555555555555';
 const originalFetch=global.fetch;
 const env={SUPABASE_URL:'https://database.test',SUPABASE_SERVICE_ROLE_KEY:'server-test',SUPABASE_PUBLISHABLE_KEY:'public-test',EHUB_API_KEY:'key-test',EHUB_API_SECRET:'secret-test',EHUB_SENDER_ID:sender,EHUB_WEBHOOK_SECRET:'webhook-test',SITE_URL:'https://akili.test'};
 const response=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
-async function fixture(callback,{timeout=false,role='admin'}={}){
+async function fixture(callback,{timeout=false,role='admin',saveFails=false}={}){
  const previous=Object.fromEntries(Object.keys(env).map(k=>[k,process.env[k]]));Object.assign(process.env,env);
  const state={campaign:null,sends:0,messages:[],calls:[]};
  global.fetch=async(input,opts={})=>{
@@ -28,7 +28,7 @@ async function fixture(callback,{timeout=false,role='admin'}={}){
   if(path==='/rest/v1/akili_profiles')return response([{user_id:uid,email:'qa@example.invalid',role:'reader',status:'active'}]);
   if(path==='/rest/v1/akili_sms_campaigns'){
    if(opts.method==='POST'){if(!state.campaign)state.campaign={...body,status:'draft'};return response(null);}
-   if(opts.method==='PATCH'){const expected=url.searchParams.get('status');if(expected&&state.campaign.status!==expected.slice(3))return response([]);Object.assign(state.campaign,body);return response([state.campaign]);}
+   if(opts.method==='PATCH'){const expected=url.searchParams.get('status');if(expected&&state.campaign.status!==expected.slice(3))return response([]);if(saveFails&&body.status==='accepted')throw Error('Database write interrupted');Object.assign(state.campaign,body);return response([state.campaign]);}
    return response(state.campaign?[state.campaign]:[]);
   }
   if(path==='/rest/v1/akili_sms_messages'){
@@ -60,6 +60,10 @@ test('an uncertain SMS submission is recorded and never blindly retried',async()
  await assert.rejects(sendBulk({id:uid},bulk));assert.equal(state.campaign.status,'unknown');
  await assert.rejects(sendBulk({id:uid},bulk),/tayari/);assert.equal(state.sends,1);
 },{timeout:true}));
+test('provider acceptance followed by a database interruption remains uncertain and cannot resend',async()=>fixture(async state=>{
+ await assert.rejects(sendBulk({id:uid},bulk));assert.equal(state.campaign.status,'unknown');
+ await assert.rejects(sendBulk({id:uid},bulk),/tayari/);assert.equal(state.sends,1);
+},{saveFails:true}));
 test('a reader cannot submit or inspect an admin SMS campaign',async()=>fixture(async state=>{
  for(const action of ['market-admin-sms-data','market-admin-sms-preview','market-admin-sms-send']){
   const r=await app.fetch(new Request('https://akili.test/api?action='+action,{method:'POST',headers:{Authorization:'Bearer reader','Content-Type':'application/json'},body:JSON.stringify(bulk)}));assert.equal(r.status,403);

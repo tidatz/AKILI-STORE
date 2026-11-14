@@ -55,16 +55,18 @@ export async function sendBulk(u,input){
  if(campaign.status!=='draft')throw new HttpError(409,'Ombi hili tayari limetumwa. Hakiki historia yake kabla ya kuanzisha jipya.');
  const reserved=await patch('akili_sms_campaigns',eq('id',campaign.id)+'&status=eq.draft',{status:'submitting'});
  if(!reserved.length)throw new HttpError(409,'Ujumbe huu unashughulikiwa.');
+ let providerAccepted=false;
  try{
   const result=await ehub('/sms/send-bulk',{method:'POST',body:{recipients:values.recipients,message:values.message,sender_id:process.env.EHUB_SENDER_ID,campaign_name:values.name||'AKILI STORE'}});
   if(!isUuid(result.campaign_id)) {const e=new HttpError(502,'Hakiki historia ya eHub kuthibitisha ujumbe.');e.uncertain=true;throw e;}
+  providerAccepted=true;
   // Once eHub accepts, never re-send if saving the provider result is interrupted.
   campaign=(await patch('akili_sms_campaigns',eq('id',campaign.id),{status:'accepted',provider_campaign_id:result.campaign_id,total_cost:result.total_cost??null,submitted_at:new Date().toISOString()}))[0];
   for(const m of result.messages||[])if(isUuid(m.message_id))await supa('/rest/v1/akili_sms_messages',{method:'POST',body:{provider_message_id:m.message_id,campaign_id:campaign.id,phone:phoneNumber(m.to),status:'queued'},headers:{Prefer:'resolution=ignore-duplicates'}});
   return {campaign};
  }catch(e){
   // No automatic POST retry: eHub does not document an idempotency key.
-  await patch('akili_sms_campaigns',eq('id',input.requestId)+'&status=eq.submitting',{status:e.uncertain?'unknown':'failed'});throw e;
+  await patch('akili_sms_campaigns',eq('id',input.requestId)+'&status=eq.submitting',{status:providerAccepted||e.uncertain?'unknown':'failed'});throw e;
  }
 }
 export function verifySmsWebhook(event){
@@ -99,10 +101,12 @@ export async function paidSms(order){
  const key='order-paid:'+order.id,recipient=phoneNumber(order.customer_phone);
  await supa('/rest/v1/akili_message_deliveries',{method:'POST',body:{key,recipient,status:'queued'},headers:{Prefer:'resolution=ignore-duplicates'}});
  const lock=await patch('akili_message_deliveries',eq('key',key)+'&status=eq.queued',{status:'sending'});if(!lock.length)return;
+ let providerAccepted=false;
  try{
   const result=await ehub('/sms/send',{method:'POST',body:{to:recipient,message:'AKILI STORE: Malipo yako ya TSh '+order.amount_tzs.toLocaleString('en-US')+' yamethibitishwa. Soma kitabu chako: '+siteOrigin()+'/my-library',sender_id:process.env.EHUB_SENDER_ID}});
   if(!isUuid(result.message_id)){const e=new Error('Incomplete SMS response');e.uncertain=true;throw e;}
+  providerAccepted=true;
   await supa('/rest/v1/akili_sms_messages',{method:'POST',body:{provider_message_id:result.message_id,phone:recipient,status:'sent'},headers:{Prefer:'resolution=ignore-duplicates'}});
   await patch('akili_message_deliveries',eq('key',key),{status:'accepted',provider_message_id:result.message_id});
- }catch(e){await patch('akili_message_deliveries',eq('key',key)+'&status=eq.sending',{status:e.uncertain?'unknown':'failed'});}
+ }catch(e){await patch('akili_message_deliveries',eq('key',key)+'&status=eq.sending',{status:providerAccepted||e.uncertain?'unknown':'failed'});}
 }
