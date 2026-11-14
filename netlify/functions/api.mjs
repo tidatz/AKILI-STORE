@@ -101,9 +101,15 @@ async function handle(event){
   }
   if(action==='status'&&method==='POST'){
     const b=json(event),order=await one('ebook_orders',eq('id',uuid(b.orderId)));
-    if(!order||!(/^[0-9a-f]{64}$/.test(String(b.clientSecret||''))) ||
-        order.checkout_secret_hash!==sha(b.clientSecret))
-      throw new HttpError(403,'Access haijaruhusiwa.');
+    if(!order)throw new HttpError(403,'Access haijaruhusiwa.');
+    const capability=typeof b.clientSecret==='string'&&/^[0-9a-f]{64}$/.test(b.clientSecret)&&order.checkout_secret_hash===sha(b.clientSecret);
+    if(!capability){
+      if(!(event.headers.authorization||event.headers.Authorization))throw new HttpError(403,'Access haijaruhusiwa.');
+      // A verified buyer can recover their own purchase from order history
+      // after closing the original checkout tab. This never grants another user's order.
+      const owner=await currentUser(event);
+      if(order.user_id!==owner.id)throw new HttpError(403,'Access haijaruhusiwa.');
+    }
     let status=order.status;
     // A signed webhook is primary; this is a server-side reconciliation fallback.
     // A conditional DB update limits repeated provider requests per order.
