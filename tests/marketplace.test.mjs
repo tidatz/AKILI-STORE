@@ -18,6 +18,7 @@ async function mock(role,callback,overrides={}){
   else if(url.pathname==='/rest/v1/ebook_books')result=[{id:bookId,author_id:other,title:'Existing book',slug:'existing-book',price_tzs:25000,status:'draft',pdf_path:'private/full.pdf',preview_path:'sample.pdf',cover_path:'cover.png'}];
   else if(url.pathname==='/rest/v1/ebook_site_settings')result=[{site_name:'AKILI STORE'}];
   else result=[];
+  if(result instanceof Response)return result;
   return new Response(JSON.stringify(result),{status:200,headers:{'Content-Type':'application/json'}});
  };
  try{await callback(calls);}finally{global.fetch=originalFetch;for(const[k,v]of Object.entries(old)){if(v===undefined)delete process.env[k];else process.env[k]=v;}}
@@ -56,10 +57,13 @@ test('purchase confirmation cannot expose another buyer or an unpaid or revoked 
  assert.equal((await request('market-purchase',{orderId:other},null)).status,401);
 });
 test('a paid buyer library contains the purchased book and authorizes a fresh read and download',async()=>mock('reader',async calls=>{
- const lib=await (await request('market-library')).json();assert.equal(lib.books[0].id,bookId);
+ for(let i=0;i<2;i++){const r=await request('market-library');assert.equal(r.status,200);const lib=await r.json();assert.equal(lib.books[0].id,bookId);}
  for(const purpose of ['read','download']){
   const r=await request('market-access',{bookId,purpose});assert.equal(r.status,200);const data=await r.json();
   assert.ok(data.url.startsWith('https://database.test/storage/v1/object/sign/ebook-pdfs/'));assert.equal(data.filename,'existing-book.pdf');
  }
  assert.equal(calls.filter(c=>c.path.startsWith('/storage/v1/object/sign/')).length,2);
-},{'/rest/v1/ebook_orders':()=>[{id:other,book_id:bookId,user_id:uid,status:'paid'}],'/rest/v1/akili_entitlements':()=>[{book_id:bookId,user_id:uid,order_id:other}],'/storage/v1/object/sign/ebook-pdfs/private/full.pdf':()=>({signedURL:'/object/sign/ebook-pdfs/private/full.pdf?token=unit-test-only'})}));
+},{'/rest/v1/ebook_orders':()=>[{id:other,book_id:bookId,user_id:uid,status:'paid'}],'/rest/v1/akili_entitlements':(url,opts)=>{
+ if(opts.method==='POST'&&url.searchParams.get('on_conflict')!=='user_id,book_id')return new Response(JSON.stringify({code:'23505',message:'duplicate key value violates unique constraint akili_entitlements_user_id_book_id_key'}),{status:409});
+ return [{book_id:bookId,user_id:uid,order_id:other}];
+},'/storage/v1/object/sign/ebook-pdfs/private/full.pdf':()=>({signedURL:'/object/sign/ebook-pdfs/private/full.pdf?token=unit-test-only'})}));

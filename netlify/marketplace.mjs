@@ -107,7 +107,9 @@ export async function marketplace(event,action){
    // Bind historical paid guest orders only after the email has been verified by Auth.
    await patch('ebook_orders',eq('customer_email',u.email.toLowerCase())+'&user_id=is.null&status=eq.paid',{user_id:u.id});
    const orders=await rows('ebook_orders','select=id,book_id,status,created_at,paid_at,amount_tzs&'+eq('user_id',u.id)+'&status=eq.paid&order=paid_at.desc');
-   for(const o of orders)await supa('/rest/v1/akili_entitlements',{method:'POST',body:{user_id:u.id,book_id:o.book_id,order_id:o.id},headers:{Prefer:'resolution=ignore-duplicates'}});
+   // The webhook has usually created this entitlement already. Match the
+   // business unique key rather than the generated primary-key UUID.
+   for(const o of orders)await supa('/rest/v1/akili_entitlements?on_conflict=user_id,book_id',{method:'POST',body:{user_id:u.id,book_id:o.book_id,order_id:o.id},headers:{Prefer:'resolution=ignore-duplicates'}});
    const [access,progress]=await Promise.all([rows('akili_entitlements','select=book_id,created_at&'+eq('user_id',u.id)+'&revoked_at=is.null'),rows('akili_reading_progress','select=book_id,page,total_pages&'+eq('user_id',u.id))]);
    const paid=new Set(orders.map(o=>o.book_id));const books=[];
    for(const a of access){if(!paid.has(a.book_id))continue;const book=await one('ebook_books',eq('id',a.book_id));if(book)books.push({...publicBook(book),purchased_at:a.created_at,progress:progress.find(p=>p.book_id===book.id)||null});}
