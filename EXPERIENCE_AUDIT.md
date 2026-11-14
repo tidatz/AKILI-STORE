@@ -1,50 +1,52 @@
-# AKILI STORE — ukaguzi wa mtiririko na muonekano
+# AKILI STORE — uthibitisho wa utendaji na maandalizi ya marketing
 
-Tarehe: 14 Novemba 2026. Mradi: tidatz/AKILI-STORE, www.akilistore.com.
+14 Novemba 2026 · Mradi: tidatz/AKILI-STORE · www.akilistore.com
 
-## Kilichorekebishwa
+## Mtiririko unaohakikiwa
 
-| Sehemu | Tabia mpya | Uthibitisho |
+Msomaji anafungua link ya jina la kitabu, anaona sampuli na bei, anaweka taarifa, analipia kupitia Snippe, kisha anasoma au kupakua. Akaunti yenye email iliyothibitishwa inaunganisha kitabu na maktaba. Admin anasimamia waandishi, roles na access; mwandishi anapakia rasimu, anawasilisha kwa ukaguzi na anaona mauzo halisi.
+
+## Vipengele na ushahidi
+
+| Sehemu | Tabia iliyokamilishwa | Uthibitisho |
 | --- | --- | --- |
-| Kushare | Link ya `/book/jina-la-kitabu`, Web Share na njia ya kunakili; PDF tokens hazishirikishwi | API/unit na ukaguzi wa DOM |
-| Link previews | Jina, maelezo mafupi, jalada na canonical kwenye HTML ya book page | Vipimo vya HTML escaping na private-path exclusion |
-| Kuingia/kujisajili | Hifadhi ukurasa, query na sehemu ya ukurasa; msomaji huanza dukani; mwandishi na admin wana eneo lao | OAuth, email callback, safe return URL na DOM |
-| Footer | Dukani na kurasa za taarifa; haionekani kwenye auth, checkout, purchase, dashboard na reader | DOM kwa guest, reader, author na admin |
-| Ununuzi | Mgeni anaweka jina, email na simu bila akaunti; bei inasomwa server-side | Mock provider tests; hakuna malipo mapya ya majaribio yaliyotumwa |
-| Baada ya malipo | Receipt, Soma na Pakua; guest token inahifadhiwa kwenye session ya browser; email iliyothibitishwa inaunganisha manunuzi na maktaba | Paid/pending/revoked/IDOR tests na guest DOM flow |
-| Nunua → Soma | Access ya akaunti inabadilisha CTA kwenye landing, catalog na book page | DOM kwa reader mwenye kitabu |
-| Reader | Progress, kupakua, native PDF fallback na kushare public book page | Existing paid flow + fallback/recovery tests |
-| Loading | Logo halisi, Welcome, AKILI STORE, pen na underline; mara moja kwa tab; reduced motion | Source na ukaguzi wa browser |
-| Muonekano | Mitindo sita; Dark, Light, Normal; mtindo mmoja pia kwenye reader | 18 validated combinations; DOM na browser |
-| Form fields | Labels zinabaki; placeholders zote za mifano zimeondolewa | DOM kwenye routes za roles zote |
-| Description | Rasimu ya bure inayotumia jina na mwandishi ndani ya browser | Haidai kutumia AI ya nje wala kubuni sura/ushuhuda |
+| Malipo → kitabu | Bei ya server, idempotency, webhook yenye saini, uthibitishaji wa provider, receipt, Soma na Pakua | Vipimo vya pending/paid/failed, amount mismatch, retries na manunuzi halisi yaliyokuwepo |
+| Guest checkout | Jina, email na simu bila kulazimisha akaunti; Soma inaonekana kwa guest aliyelipa kwenye tab hiyo | DOM flow na capability authorization tests |
+| Akaunti na maktaba | Verified email binding, session refresh, callback na password recovery zinarudisha ukurasa, query na sehemu husika | Auth tests, DOM na database |
+| Roles na akaunti | Reader, Author na Admin; soft delete na restore; admin wa mwisho haondolewi | RPC tests chini ya service_role ndani ya transaction iliyorudishwa nyuma |
+| Access | Grant/revoke tofauti na malipo; haiundi paid order au mapato | DB transaction na API tests |
+| Waandishi | Mwaliko wa email; reusable link zenye expiry, quota, revocation na acceptance ya mara moja kwa account | RPC na API tests; hakuna invitation email ya majaribio iliyotumwa |
+| Usalama wa mialiko | Server inathibitisha token na confirmed email; RPC hutumia profile inayosawazishwa na server | Auth rejection tests; hakuna SELECT ya auth.users iliyotolewa kwa service_role |
+| Uchapishaji | Jalada, full PDF na sample tofauti hukaguliwa; idadi ya kurasa hupimwa kutoka PDF | PDF tests; full PDF haiwezi kuchapishwa kama sample |
+| Editor ya mwandishi | Published/submitted book inaonekana bila kutoa fomu zinazoweza kushindwa kuhifadhi; admin anaweza kusimamia mabadiliko | DOM kwa author/admin |
+| Kushare | Public named URL na clipboard/native share; reader token haishirikishwi | Share tests na ukaguzi wa browser |
+| Muonekano | Mitindo sita, Light/Dark/Normal; preference inahifadhiwa kwenye akaunti, default kwenye duka; reduced motion | Enum/API tests, mode combinations na browser |
+| Footer na forms | Footer haionekani kwenye dashboard, reader, auth, checkout na receipt; hakuna placeholders za mifano | DOM kwa guest, reader, author na admin |
+| Loading | Logo halisi, Welcome, AKILI STORE na pen/underline; mara moja kwa tab | Browser |
+| Marketing | Canonical URL, OG/Twitter previews, Book/WebSite structured data na dynamic sitemap ya published books | SEO tests; private pages zina noindex na no-store |
+| Copy ya kitabu | Maelezo na mada saba zimetokana na PDF halisi; landing inabaki fupi | akili-store-mifumo-7.pdf, kurasa 1–9 |
+| SMS | Muunganisho wa admin, preview kabla ya kutuma, idempotency na delivery-signature validation | Provider mocks na security tests; hakuna SMS ya majaribio iliyotumwa |
 
-## Mabadiliko ya database yanayosubiri idhini
+## Mabadiliko ya database yaliyotumika
 
-Faili `supabase/experience.sql` limeandaliwa na halijatumika. Ukaguzi wa ruhusa wa kiotomatiki ulizuia Run query kwenye Supabase production baada ya onyo la destructive operations.
+- `supabase/experience.sql`: grants, author links, acceptances, appearance, soft deletion na routines za usimamizi.
+- `supabase/experience_auth_fix.sql`: marekebisho yaliyotumika kwenye mialiko ya awali; tayari yamejumuishwa kwenye experience.sql kwa installation mpya.
+- `supabase/readiness_indexes.sql`: covering indexes 13; advisor haionyeshi tena foreign keys zisizo na indexes.
+- `supabase/marketing_update.sql`: maelezo ya bidhaa na yaliyomo, pamoja na version/audit; bei na files hazibadilishwi.
+- `supabase/experience_verify.sql`: fixtures, role changes, grant/revoke, delete/restore na invite checks zote zinarudishwa nyuma baada ya kupimwa. Hakuna akaunti ya majaribio inayobaki.
 
-Mabadiliko hayo yanaongeza:
+Tables mpya zina RLS, hakuna anon/authenticated table access, na RPC ni SECURITY INVOKER zenye EXECUTE ya service_role pekee. Ledger na rekodi za miamala hazibadilishwi na usimamizi wa roles au manual book access.
 
-- `akili_book_grants` kwa kutoa na kuondoa access bila kuunda malipo.
-- `akili_author_links` na acceptances kwa link zenye expiry, quota na revocation.
-- `appearance` kwenye profile/settings na `deleted_at` kwenye profiles.
-- RPC tatu za service_role pekee. Hakuna EXECUTE kwa PUBLIC, anon au authenticated. RLS imewashwa kwenye tables mpya.
-- Ulinzi wa admin wa mwisho na wa kujifuta/kujisuspend; kufuta akaunti kunakuwa recoverable soft delete; miamala na ledger hazifutwi.
+## Validation
 
-SQL huunda functions; body zake zinazobadili roles au access hazitekelezwi wakati wa kuunda schema. Zitatekelezwa tu admin anapoomba hatua husika baada ya uamilishaji.
+Vipimo 88 vya server/auth/payment/security/SEO vimepita, pamoja na syntax checks, build, DOM flows na database transaction checks. npm audit haikuonyesha vulnerabilities. Ukaguzi wa browser na HTTP wa production unahakiki rendering, metadata, redirects, private headers na upatikanaji wa kitabu kilicholipiwa.
 
-Hadi idhini hiyo ipatikane, mfumo unatambua schema ya sasa: ununuzi uliopo na guest checkout vinaendelea; mitindo inahifadhiwa kwenye kifaa. Roles mpya, book grants, soft delete, reusable author links, na kuhifadhi muonekano kwa account/devices mbalimbali vinaonyesha hali ya kusubiri. Mialiko ya mwandishi inayofungamana na email inaendelea.
+Hakuna mobile-money charge, payout, bulk SMS, ad au ujumbe wa majaribio kwa mtu mwingine uliotumwa na ukaguzi huu. Vipimo vya provider vinatumia mocks; manunuzi halisi yaliyokuwepo yamehakikiwa bila kubuni paid status.
 
-## Vipimo na mipaka
+## Mambo ya nje yanayobaki tofauti na utendaji wa duka
 
-- Vipimo 79 vya server/auth/payment/security vimepita. Syntax checks, build, diff checks na npm audit pia zimepita; audit haikuonyesha vulnerabilities.
-- DOM flows zimepimwa kwa guest, reader, author, admin, reader mwenye kitabu, na schema ya sasa isiyobadilishwa. Reader fallback na session recovery zimepita.
-- Vipimo vya provider hutumia mocks; hakuna SMS, invitation email au mobile-money charge mpya iliyotumwa wakati wa ukaguzi huu.
-- Miamala halisi iliyokuwepo imeachwa. Bei ya sasa ya kitabu iliyowekwa na admin ni TSh 500.
-- Buyer receipt email ya Resend bado haijaunganishwa. Fulfillment ya ukurasa na maktaba inafanya kazi bila hiyo. Bulk SMS haijatumwa.
-- Supabase advisor ina INFO kwa tables zenye RLS bila policies kwa sababu zinatumiwa na server pekee; leaked password protection ina WARN inayobaki. Google OAuth consent branding bado ni mpangilio wa nje wa Google/Supabase.
-- Huu ni ukaguzi wa utekelezaji na vipimo vilivyoelezwa hapa. Hauwakilishi cheti cha ukaguzi wa mamlaka au tathmini ya kitaifa.
-
-## Baada ya idhini ya schema
-
-Tekeleza `supabase/experience.sql` kama transaction kwenye project iliyotajwa. Hakiki table privileges/RLS na RPCs; pima role/access/invite kwenye transaction inayorudishwa nyuma. Schema readiness huangaliwa tena ndani ya sekunde 45, hivyo features zilizotayarishwa hazihitaji kubadili secrets au kuunda malipo.
+- Buyer receipt email ya Resend bado haijaunganishwa. Msomaji anapata kitabu kwenye receipt page na maktaba bila huduma hiyo.
+- SMS delivery reports zinahitaji webhook signing secret ya eHub ikiwa bado haijahifadhiwa; bila hiyo, hali isiyothibitishwa haionyeshwi kama delivered.
+- Google OAuth consent branding ni mpangilio wa Google/Supabase wa nje. Hakuna scope mpya au credential iliyoanzishwa wakati wa ukaguzi huu.
+- Supabase leaked password protection ina WARN. RLS-without-policy INFO ni ya tables za server pekee; unused-index INFO inatarajiwa kwa indexes mpya.
+- Huu ni uthibitisho wa kiufundi wa vipengele na ushahidi ulioelezwa. Hauwakilishi cheti cha mamlaka au ahadi ya nafasi kwenye search engines.

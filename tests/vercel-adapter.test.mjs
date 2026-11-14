@@ -2,6 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import app from '../api/index.js';
 
+test('HEAD returns the same public route status and headers without a response body',async()=>{
+ const reply=await app.fetch(new Request('https://store.test/api?action=config',{method:'HEAD'}));
+ assert.equal(reply.status,200);assert.ok(reply.headers.get('Content-Type').includes('application/json'));assert.equal(await reply.text(),'');
+});
+test('OPTIONS creates a valid empty 204 response',async()=>{
+ const reply=await app.fetch(new Request('https://store.test/api?action=checkout',{method:'OPTIONS'}));
+ assert.equal(reply.status,204);assert.equal(await reply.text(),'');
+});
+
 test('GET /api?action=config uses the real API without requiring payment secrets',async()=>{
  const reply=await app.fetch(new Request('https://example.vercel.app/api?action=config'));
  assert.equal(reply.status,200);

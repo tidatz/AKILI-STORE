@@ -72,7 +72,7 @@ test('changing a saved normal checkout into a discounted check cannot reuse the 
  assert.equal((await checkout()).status,409);assert.equal(state.providerCalls.length,0);assert.equal(state.order.amount_tzs,25000);
 }));
 test('cross origin requests and invalid mobile numbers fail before payment creation',async()=>fixture(async(state,checkout)=>{
- assert.equal((await checkout(body,'session','https://other.test')).status,403);
+ assert.equal((await checkout(body,'session','https://other.test')).status,403);assert.equal((await checkout(body,'session','null')).status,403);
  assert.equal((await checkout({...body,phone:'0221234567'})).status,400);assert.equal(state.providerCalls.length,0);
 }));
 

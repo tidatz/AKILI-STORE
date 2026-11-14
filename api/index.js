@@ -14,8 +14,10 @@ export default {
       isBase64Encoded: false
     };
     const response = await handler(event);
-    return new Response(response.body ?? null, {
-      status: response.statusCode ?? 200,
+    const status=response.statusCode??200;
+    const bodiless=request.method==='HEAD'||[204,205,304].includes(status);
+    return new Response(bodiless?null:response.body??null, {
+      status,
       headers: response.headers ?? {}
     });
   }

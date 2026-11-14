@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import {experienceReady} from '../experience.mjs';
 import {HttpError,sha,randomToken,isUuid,clean,supa,rows,insert,patch,remove,eq,one,assetUrl,signFile,adminUser,snippe,verifyWebhook,applyPayment,generateAccess,emailAccess} from '../lib.mjs';
 import {bookPage} from '../book-page.mjs';
+import {storefrontPage,sitemap} from '../seo.mjs';
 import {marketplace,currentUser,validatePublication,publicBook,entitled} from '../marketplace.mjs';
 import {receiveSms,paidSms} from '../communications.mjs';
 
@@ -27,8 +28,10 @@ async function handle(event){
   if(method==='POST'&&!['webhook','sms-webhook'].includes(action)){
     const origin=event.headers.origin||event.headers.Origin;
     const host=event.headers.host||event.headers.Host;
-    if(origin&&host&&new URL(origin).host!==host)throw new HttpError(403,'Origin haijaruhusiwa.');
+    if(origin&&host){let parsed;try{parsed=new URL(origin);}catch{throw new HttpError(403,'Origin haijaruhusiwa.');}if(!['https:','http:'].includes(parsed.protocol)||parsed.host.toLowerCase()!==host.toLowerCase())throw new HttpError(403,'Origin haijaruhusiwa.');}
   }
+  if(action==='store-page'&&method==='GET')return storefrontPage(event.queryStringParameters?.page||'home');
+  if(action==='sitemap'&&method==='GET')return sitemap();
   if(action==='book-page'&&method==='GET')return bookPage(event.queryStringParameters?.slug||'');
   const marketResult=await marketplace(event,action);
   if(marketResult!==undefined)return ok(marketResult);
@@ -243,7 +246,7 @@ async function handle(event){
       const id=b.id?uuid(b.id):crypto.randomUUID();
       if(values.status==='published'){
         const existing=b.id?await one('ebook_books',eq('id',id)):null;
-        await validatePublication({...existing,...values});
+        values.page_count=(await validatePublication({...existing,...values})).page_count;
       }
       if(values.featured){
         await patch('ebook_books','featured=eq.true',{featured:false});
@@ -313,9 +316,10 @@ async function handle(event){
   throw new HttpError(404,'Endpoint haipo.');
 }
 export const handler=async event=>{
-  try{return await handle(event);}
+  const head=event.httpMethod==='HEAD';
+  try{const response=await handle(head?{...event,httpMethod:'GET'}:event);return head?{...response,body:''}:response;}
   catch(e){
     if(!(e instanceof HttpError))console.error('Unhandled API exception',e?.message||e);
-    return fail(e instanceof HttpError?e.status:500,e instanceof HttpError?e.message:'Tatizo la server. Jaribu tena.');
+    const response=fail(e instanceof HttpError?e.status:500,e instanceof HttpError?e.message:'Tatizo la server. Jaribu tena.');return head?{...response,body:''}:response;
   }
 };

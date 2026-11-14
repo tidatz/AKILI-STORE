@@ -101,3 +101,5 @@ html[data-theme] .checkout-steps li.done:before{background:var(--soft);color:var
 html[data-design=glass] .dashboard,html[data-design=glass] .dash-body{background:transparent}
 @media(max-width:800px){.topbar .account-link{display:none}.design-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.account-tabs{gap:7px}.account-tabs .chip{padding:8px 12px}.access-list>div{align-items:flex-start}.join-author{padding-top:34px}.description-helper{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-delay:0ms!important;transition-duration:.01ms!important}}
+
+.editor-fields{border:0;padding:0;margin:0;min-width:0}.editor-fields:disabled .file-upload{cursor:not-allowed;opacity:.65}
