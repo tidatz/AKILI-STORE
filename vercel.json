@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "outputDirectory": "public",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/",
@@ -13,7 +13,7 @@
     },
     {
       "source": "/purchase/:orderId",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/book/:slug",
@@ -29,91 +29,91 @@
     },
     {
       "source": "/search",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/authors/:slug",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/login",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/register",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/forgot-password",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/auth/callback",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/reader-dashboard",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/my-library",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/order-history",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/profile-settings",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/notifications",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/help",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/platform-policies",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/invite",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/checkout/:bookId",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/author-dashboard",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/author/:path*",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/sales-analytics",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/withdrawal-request",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/admin",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/admin/:path*",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     },
     {
       "source": "/join-author",
-      "destination": "/index.html"
+      "destination": "/app-shell.html"
     }
   ],
   "headers": [
@@ -165,7 +165,7 @@
       ]
     },
     {
-      "source": "/index.html",
+      "source": "/app-shell.html",
       "headers": [
         {
           "key": "Cache-Control",

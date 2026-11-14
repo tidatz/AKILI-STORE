@@ -1,4 +1,4 @@
-import {mkdir,copyFile} from 'node:fs/promises';
+import {mkdir,copyFile,cp,rm} from 'node:fs/promises';
 import sharp from 'sharp';
 
 // Serve the pinned PDF reader from the store's own domain on every deployment.
@@ -16,3 +16,12 @@ for(const [file,size] of [['favicon.png',64],['apple-touch-icon.png',180],['asse
  await sharp(logo.pathname).resize(size,size,{fit:'contain',background:{r:0,g:0,b:0,alpha:0}}).png().toFile(new URL('../public/'+file,import.meta.url).pathname);
 }
 console.log('AKILI STORE brand icons prepared.');
+
+// A static index.html would take precedence over Vercel's homepage rewrite.
+// Keep the source template for server metadata, and publish the SPA shell under
+// a separate name so / reaches the storefront function on both hosting targets.
+const source=new URL('../public/',import.meta.url),dist=new URL('../dist/',import.meta.url);
+await rm(dist,{recursive:true,force:true});
+await cp(source,dist,{recursive:true,filter:path=>!String(path).endsWith('/index.html')});
+await copyFile(new URL('index.html',source),new URL('app-shell.html',dist));
+console.log('Storefront deployment prepared.');

@@ -24,6 +24,7 @@ Msomaji anafungua link ya jina la kitabu, anaona sampuli na bei, anaweka taarifa
 | Footer na forms | Footer haionekani kwenye dashboard, reader, auth, checkout na receipt; hakuna placeholders za mifano | DOM kwa guest, reader, author na admin |
 | Loading | Logo halisi, Welcome, AKILI STORE na pen/underline; mara moja kwa tab | Browser |
 | Marketing | Canonical URL, OG/Twitter previews, Book/WebSite structured data na dynamic sitemap ya published books | SEO tests; private pages zina noindex na no-store |
+| Deployment | Landing inapitia metadata ya server; static SPA shell haizuii homepage rewrite | Ukaguzi wa HTTP wa production ulibaini precedence ya index.html; build hutenganisha shell kwenye dist |
 | Copy ya kitabu | Maelezo na mada saba zimetokana na PDF halisi; landing inabaki fupi | akili-store-mifumo-7.pdf, kurasa 1–9 |
 | SMS | Muunganisho wa admin, preview kabla ya kutuma, idempotency na delivery-signature validation | Provider mocks na security tests; hakuna SMS ya majaribio iliyotumwa |
 

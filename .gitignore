@@ -3,6 +3,7 @@
 !.env.example
 .netlify/
 node_modules/
+dist/
 public/vendor/pdfjs/
 public/favicon.png
 public/apple-touch-icon.png
