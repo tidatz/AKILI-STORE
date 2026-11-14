@@ -5,10 +5,10 @@ import {callback,googleLogin,signout} from '../public/auth.js';
 
 const target='/checkout/22222222-2222-4222-8222-222222222222?verify=1';
 async function fixture(run){
- const names=['location','history','sessionStorage','fetch','crypto'];
+ const names=['location','history','sessionStorage','localStorage','fetch','crypto'];
  const previous=new Map(names.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)])),stored=new Map(),calls=[];
  const location={origin:'https://store.test',pathname:'/auth/callback',search:'',hash:'#access_token=unit-test-token&refresh_token=unit-test-refresh&expires_in=3600',assign:value=>calls.push({navigation:value})};
- Object.defineProperties(globalThis,{location:{configurable:true,value:location},history:{configurable:true,value:{replaceState:()=>{location.hash='';location.search='';}}},sessionStorage:{configurable:true,value:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,String(v)),removeItem:k=>stored.delete(k)}},crypto:{configurable:true,value:webcrypto},fetch:{configurable:true,value:async(url,opts={})=>{calls.push({url,method:opts.method});return new Response(JSON.stringify(String(url).includes('action=config')?{supabase_url:'https://database.test',publishable_key:'public-test'}:{}),{status:200,headers:{'Content-Type':'application/json'}});}}});
+ Object.defineProperties(globalThis,{location:{configurable:true,value:location},history:{configurable:true,value:{replaceState:()=>{location.hash='';location.search='';}}},sessionStorage:{configurable:true,value:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,String(v)),removeItem:k=>stored.delete(k)}},localStorage:{configurable:true,value:{getItem:k=>stored.get('local:'+k)||null,setItem:(k,v)=>stored.set('local:'+k,String(v)),removeItem:k=>stored.delete('local:'+k)}},crypto:{configurable:true,value:webcrypto},fetch:{configurable:true,value:async(url,opts={})=>{calls.push({url,method:opts.method});return new Response(JSON.stringify(String(url).includes('action=config')?{supabase_url:'https://database.test',publishable_key:'public-test'}:{}),{status:200,headers:{'Content-Type':'application/json'}});}}});
  try{await run({stored,calls,location});}finally{for(const k of names){const d=previous.get(k);if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];}}
 }
 test('Google callback preserves the exact checkout query and consumes its return target once',async()=>fixture(async({stored,location})=>{
@@ -16,7 +16,7 @@ test('Google callback preserves the exact checkout query and consumes its return
  assert.equal((await callback()).next,null);
 }));
 test('OAuth return targets cannot redirect to an external origin',async()=>fixture(async({stored})=>{
- for(const bad of ['https://other.test/checkout','//other.test/checkout','/\\other.test','/\nother']){stored.set('akili-next',bad);assert.equal((await callback()).next,'/my-library');}
+ for(const bad of ['https://other.test/checkout','//other.test/checkout','/\\other.test','/\nother','/%5cother.test','/%2fother.test','/%0aother']){stored.set('akili-next',bad);assert.equal((await callback()).next,'/');}
 }));
 test('Google sign in offers account selection and keeps the intended admin checkout',async()=>fixture(async({stored,calls})=>{
  await googleLogin(target);const u=new URL(calls.find(c=>c.navigation).navigation);assert.equal(u.origin,'https://database.test');
@@ -27,4 +27,10 @@ test('Google sign in offers account selection and keeps the intended admin check
 test('switching accounts revokes only the current app session',async()=>fixture(async({stored,calls})=>{
  stored.set('akili-session',JSON.stringify({access_token:'unit-test-token'}));await signout();assert.equal(stored.has('akili-session'),false);
  const call=calls.find(c=>c.url?.includes('/logout'));assert.equal(new URL(call.url).searchParams.get('scope'),'local');
+}));
+
+test('an email confirmation opened in another tab restores and consumes the saved page and section',async()=>fixture(async({stored})=>{
+ const path='/book/kitabu-cha-maarifa#reviews';stored.set('local:akili-return',JSON.stringify({path,at:Date.now()}));
+ assert.equal((await callback()).next,path);assert.equal(stored.has('local:akili-return'),false);assert.equal((await callback()).next,null);
+ stored.set('local:akili-return',JSON.stringify({path,at:Date.now()-90000000}));assert.equal((await callback()).next,null);
 }));

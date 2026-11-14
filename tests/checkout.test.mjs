@@ -18,6 +18,8 @@ async function fixture(run,{admin=true,enabled=false,owned=false,verified=true}=
   if(path==='/auth/v1/user')return response({id:uid,email:'owner@example.invalid',email_confirmed_at:verified?'2026-01-01':null,user_metadata:{role:'admin'}});
   if(path==='/rest/v1/ebook_admins')return response(admin?[{user_id:uid}]:[]);
   if(path==='/rest/v1/akili_profiles')return response([{user_id:uid,email:'owner@example.invalid',role:'reader',status:'active'}]);
+  if(path==='/rest/v1/akili_author_links')return response([]);
+  if(path==='/rest/v1/akili_book_grants')return response([]);
   if(path==='/rest/v1/akili_entitlements')return response(owned?[{user_id:uid,book_id:bookId}]:[]);
   if(path==='/rest/v1/ebook_books')return response([{id:bookId,title:'Real book',price_tzs:25000,status:'published',pdf_path:'private.pdf'}]);
   if(path==='/rest/v1/ebook_orders'){
@@ -73,3 +75,15 @@ test('cross origin requests and invalid mobile numbers fail before payment creat
  assert.equal((await checkout(body,'session','https://other.test')).status,403);
  assert.equal((await checkout({...body,phone:'0221234567'})).status,400);assert.equal(state.providerCalls.length,0);
 }));
+
+test('guest checkout accepts buyer information without an account and still charges only the database price',async()=>fixture(async(state,checkout)=>{
+ const v={...body,verification:false,email:'guest@example.invalid',amount_tzs:1};
+ assert.equal((await checkout(v,null)).status,201);assert.equal(state.order.user_id,null);assert.equal(state.order.customer_email,v.email);assert.equal(state.order.amount_tzs,25000);
+ assert.equal(state.providerCalls.length,1);assert.equal((await checkout(v,null)).status,200);assert.equal(state.providerCalls.length,1);
+ assert.equal((await checkout({...v,email:'other@example.invalid'},null)).status,409);
+},{enabled:true}));
+test('a guest must supply a valid email and cannot turn a guest order into a different signed-in order',async()=>fixture(async(state,checkout)=>{
+ assert.equal((await checkout({...body,verification:false,email:''},null)).status,400);assert.equal(state.providerCalls.length,0);
+ const v={...body,verification:false,email:'guest@example.invalid'};assert.equal((await checkout(v,null)).status,201);
+ assert.equal((await checkout(v,'session')).status,409);assert.equal(state.providerCalls.length,1);
+},{enabled:true}));

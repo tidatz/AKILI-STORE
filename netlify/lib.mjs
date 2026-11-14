@@ -55,6 +55,8 @@ export async function adminUser(event) {
   if(!response.ok) throw new HttpError(401,'Session imeisha. Ingia tena.');
   const user=await response.json();
   if(!isUuid(user.id) || !await one('ebook_admins',eq('user_id',user.id))) throw new HttpError(403,'Huna ruhusa ya Admin.');
+  const profile=await one('akili_profiles',eq('user_id',user.id));
+  if(!user.email_confirmed_at||!profile||profile.status!=='active'||profile.deleted_at)throw new HttpError(403,'Akaunti hii haiwezi kufanya usimamizi.');
   return user;
 }
 export async function snippe(path,options={}) {

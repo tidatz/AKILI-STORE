@@ -39,7 +39,18 @@ async function refresh(){
  return refreshPromise;
 }
 export async function login(email,password){saveSession(await auth('token?grant_type=password',{email,password}));}
-export async function register(email,password,name){
+export function rememberNext(next){
+ const target=next?safeNext(next):null;
+ if(target){sessionStorage.setItem('akili-next',target);try{localStorage.setItem('akili-return',JSON.stringify({path:target,at:Date.now()}));}catch{}}
+ else{sessionStorage.removeItem('akili-next');try{localStorage.removeItem('akili-return');}catch{}}
+}
+function consumeNext(query){
+ let saved;try{saved=parse(localStorage.getItem('akili-return'));localStorage.removeItem('akili-return');}catch{}
+ const next=query.get('next')||sessionStorage.getItem('akili-next')||(saved&&Date.now()-saved.at<86400000?saved.path:null);
+ sessionStorage.removeItem('akili-next');return next?safeNext(next):null;
+}
+export async function register(email,password,name,next=''){
+ rememberNext(next);
  const result=await auth('signup?redirect_to='+encodeURIComponent(location.origin+'/auth/callback'),{email,password,data:{full_name:name}});
  if(result.access_token)saveSession(result);return !!result.access_token;
 }
@@ -50,11 +61,15 @@ export async function googleLogin(next=''){
  const verifier=Array.from(bytes,v=>v.toString(16).padStart(2,'0')).join('');
  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));
  const challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
- sessionStorage.setItem('akili-pkce',verifier);if(next)sessionStorage.setItem('akili-next',safeNext(next));else sessionStorage.removeItem('akili-next');
+ sessionStorage.setItem('akili-pkce',verifier);rememberNext(next);
  const params=new URLSearchParams({provider:'google',redirect_to:location.origin+'/auth/callback',code_challenge:challenge,code_challenge_method:'s256',prompt:'select_account'});
  location.assign(c.supabase_url+'/auth/v1/authorize?'+params);
 }
-export function safeNext(value){return typeof value==='string'&&value.startsWith('/')&&!value.startsWith('//')&&!/[\\\x00-\x20]/.test(value)?value:'/my-library';}
+export function safeNext(value){
+ if(typeof value!=='string'||!value.startsWith('/')||value.startsWith('//')||/[\\\x00-\x20]/.test(value))return '/';
+ try{const decoded=decodeURIComponent(value);if(decoded.startsWith('//')||/[\\\x00-\x1f]/.test(decoded))return '/';const url=new URL(value,'https://akili.invalid');if(url.origin!=='https://akili.invalid')return '/';}catch{return '/';}
+ return value;
+}
 export async function callback(){
  const query=new URLSearchParams(location.search),hash=new URLSearchParams(location.hash.slice(1));
  const error=query.get('error_description')||hash.get('error_description');
@@ -64,10 +79,10 @@ export async function callback(){
    saveSession(await auth('token?grant_type=pkce',{auth_code:query.get('code'),code_verifier:verifier}));sessionStorage.removeItem('akili-pkce');
  }else if(hash.has('access_token'))saveSession({access_token:hash.get('access_token'),refresh_token:hash.get('refresh_token'),expires_in:Number(hash.get('expires_in'))||3600});
  const recovery=hash.get('type')==='recovery';history.replaceState({},'',location.pathname);
- const next=sessionStorage.getItem('akili-next');sessionStorage.removeItem('akili-next');
- return {recovery,next:next?safeNext(next):null};
+ const next=consumeNext(query);
+ return {recovery,next};
 }
-export async function recover(email){return auth('recover?redirect_to='+encodeURIComponent(location.origin+'/auth/callback'),{email});}
+export async function recover(email,next=''){rememberNext(next);return auth('recover?redirect_to='+encodeURIComponent(location.origin+'/auth/callback'),{email});}
 export async function changePassword(password){
  const c=await config(),s=session();if(!s)throw Error('Fungua kiungo kilichotumwa kwenye email yako kwanza.');
  const r=await fetch(c.supabase_url+'/auth/v1/user',{method:'PUT',headers:{apikey:c.publishable_key,Authorization:'Bearer '+s.access_token,'Content-Type':'application/json'},body:JSON.stringify({password})});

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="sw"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="no-referrer"><title>AKILI STORE</title><meta name="theme-color" content="#1D4ED8"><link rel="icon" href="/favicon.png?v=as1" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png?v=as1"><link rel="manifest" href="/site.webmanifest"><link rel="stylesheet" href="/style.css"></head>
+<meta name="referrer" content="no-referrer"><title>AKILI STORE</title><meta name="theme-color" content="#1D4ED8"><link rel="icon" href="/favicon.png?v=as1" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png?v=as1"><link rel="manifest" href="/site.webmanifest"><script src="/appearance.js"></script><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/preferences.css"></head>
 <body class="reader">
   <header class="reader-toolbar">
     <a href="/my-library" aria-label="Rudi kwenye maktaba" title="Rudi kwenye maktaba">←</a>
@@ -14,7 +14,7 @@
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg>
       </button></div>
   </header>
-  <div class="reader-actions"><button id="open-pdf" class="secondary-button" type="button" disabled>Fungua PDF</button><span>Unaweza kusoma hapa au kupakua kwa kitufe cha juu.</span></div>
-  <div class="pdf-stage" id="pdf-stage"><div><p id="reader-message" class="reader-message" role="status">Inafungua kitabu...</p><button id="retry-reader" class="secondary-button" type="button" hidden>Jaribu kufungua tena</button><a id="reader-login" class="secondary-button" hidden>Ingia kwenye akaunti</a></div><canvas id="page-canvas" hidden></canvas></div>
+  <div class="reader-actions"><button id="open-pdf" class="secondary-button" type="button" disabled>Fungua PDF</button><button id="share-book" class="secondary-button reader-share" type="button" disabled>Shiriki kitabu</button><a href="/profile-settings" class="reader-style-link">Muonekano</a><span>Unaweza kusoma hapa au kupakua.</span></div>
+  <p id="share-message" class="reader-share-message" role="status" hidden></p><div class="pdf-stage" id="pdf-stage"><div><p id="reader-message" class="reader-message" role="status">Inafungua kitabu...</p><button id="retry-reader" class="secondary-button" type="button" hidden>Jaribu kufungua tena</button><a id="reader-login" class="secondary-button" hidden>Ingia kwenye akaunti</a></div><canvas id="page-canvas" hidden></canvas></div>
   <script type="module" src="/reader.js"></script>
 </body></html>

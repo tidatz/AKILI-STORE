@@ -1,4 +1,5 @@
-import {api} from './auth.js';
+import {api,session} from './auth.js';
+import {shareBook} from './share.js';
 const $=s=>document.querySelector(s);
 const token=new URLSearchParams(location.search).get('token');
 const bookId=new URLSearchParams(location.search).get('book');
@@ -20,6 +21,7 @@ function updateButtons(){
   $('#zoom-out').disabled=!ready||zoom<=.5;
   $('#download').disabled=!details;
   $('#open-pdf').disabled=!details;
+  $('#share-book').disabled=!details?.slug;
   $('#pages').textContent=ready?page+' / '+pdf.numPages:'— / —';
   $('#zoom-label').textContent=Math.round(zoom*100)+'%';
 }
@@ -42,6 +44,7 @@ async function render(){
   try{await paint.promise;}catch(e){if(e?.name!=='RenderingCancelledException')message('Imeshindikana kuonyesha ukurasa.')}
   if(renderId===desiredRender)paint=null;
   updateButtons();
+  if(!bookId&&details?.slug){try{localStorage.setItem('akili-guest-progress-'+details.slug,JSON.stringify({page,total:pdf.numPages}));}catch{}}
   if(bookId){clearTimeout(saveTimer);saveTimer=setTimeout(()=>api('market-progress',{bookId,page,total_pages:pdf.numPages}).catch(()=>{}),1000);}
 }
 let saveTimer;
@@ -62,6 +65,7 @@ $('#download').onclick=async()=>{
   }catch(e){message(e.message)}
   finally{updateButtons()}
 };
+$('#share-book').onclick=async()=>{try{const r=await shareBook(details);if(r.cancelled)return;const el=$('#share-message');el.hidden=false;el.textContent=r.copied?'Link ya kitabu imenakiliwa.':r.shared?'Kitabu kimeshirikishwa.':r.url;}catch(e){message(e.message)}};
 $('#open-pdf').onclick=async()=>{
   $('#open-pdf').disabled=true;
   try{const data=await request('read');location.assign(data.url);}
@@ -74,12 +78,14 @@ async function openBook(){
   if(!bookId&&!/^[a-f0-9]{64}$/.test(token||'')){message('Kiungo cha kitabu hakipo au si sahihi.');return}
   try{
     details=await request('read');
-    $('#reader-title').textContent=details.title;document.title='AKILI STORE';
+    $('#reader-title').textContent=details.title;document.title=details.title+' | AKILI STORE';
+    if(details.appearance?.design)window.akiliAppearance?.setPersonal(details.appearance);
+    if(!bookId){let progress;try{progress=JSON.parse(localStorage.getItem('akili-guest-progress-'+details.slug)||'null');}catch{}page=progress?.page||1;}
     updateButtons();
     const pdfjs=await import('/vendor/pdfjs/pdf.mjs');
     pdfjs.GlobalWorkerOptions.workerSrc='/vendor/pdfjs/pdf.worker.min.mjs';
     pdf=await pdfjs.getDocument({url:details.url}).promise;
-    if(bookId)page=Math.min(pdf.numPages,Math.max(1,details.page||1));
+    page=Math.min(pdf.numPages,Math.max(1,bookId?details.page||1:page));
     updateButtons();await render();
   }catch(e){
     if(e.status===401){message('Ingia kwa akaunti uliyotumia kununua kitabu.');const login=$('#reader-login');login.href='/login?next='+encodeURIComponent(location.pathname+location.search);login.hidden=false;}
@@ -88,4 +94,5 @@ async function openBook(){
   }
 }
 $('#retry-reader').onclick=openBook;
+if(session())api('market-me').then(r=>{if(r.user.appearance?.design)window.akiliAppearance?.setPersonal(r.user.appearance);}).catch(()=>{});
 openBook();

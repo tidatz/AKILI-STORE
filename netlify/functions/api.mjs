@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
+import {experienceReady} from '../experience.mjs';
 import {HttpError,sha,randomToken,isUuid,clean,supa,rows,insert,patch,remove,eq,one,assetUrl,signFile,adminUser,snippe,verifyWebhook,applyPayment,generateAccess,emailAccess} from '../lib.mjs';
-import {marketplace,currentUser,validatePublication} from '../marketplace.mjs';
+import {bookPage} from '../book-page.mjs';
+import {marketplace,currentUser,validatePublication,publicBook,entitled} from '../marketplace.mjs';
 import {receiveSms,paidSms} from '../communications.mjs';
 
 const ok=(data,status=200)=>({statusCode:status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
@@ -11,6 +13,13 @@ const publishBook=b=>({id:b.id,slug:b.slug,title:b.title,subtitle:b.subtitle,des
 const bookFields=['slug','title','subtitle','description','price_tzs','status','featured','cover_path','pdf_path'];
 const siteFields=['site_name','logo_path','favicon_path','primary_color','text_color','font_style','buy_label','about_book','about_author','contents','contact','menu_about_book','menu_about_author','menu_contents','menu_contact'];
 
+async function checkBoundOrder(order){
+  if(!order.user_id)return;
+  const profile=await one('akili_profiles',eq('user_id',order.user_id));
+  if(!profile||profile.status!=='active'||profile.deleted_at)throw new HttpError(403,'Akaunti hii imesitishwa. Wasiliana na msaada.');
+  await entitled({id:order.user_id},order.book_id);
+}
+
 async function handle(event){
   const method=event.httpMethod;
   const action=new URLSearchParams(event.queryStringParameters?new URLSearchParams(event.queryStringParameters):'').get('action')||'';
@@ -20,6 +29,7 @@ async function handle(event){
     const host=event.headers.host||event.headers.Host;
     if(origin&&host&&new URL(origin).host!==host)throw new HttpError(403,'Origin haijaruhusiwa.');
   }
+  if(action==='book-page'&&method==='GET')return bookPage(event.queryStringParameters?.slug||'');
   const marketResult=await marketplace(event,action);
   if(marketResult!==undefined)return ok(marketResult);
   if(action==='sms-webhook'&&method==='POST')return ok(await receiveSms(event));
@@ -40,12 +50,12 @@ async function handle(event){
     const b=json(event),verification=b.verification===true;
     if(process.env.SNIPPE_PAYMENTS_ENABLED!=='true'&&!verification)
       throw new HttpError(503,'Malipo hayajawashwa. Uthibitishaji wa mwisho bado unahitajika.');
-    const buyer=await currentUser(event);
-    if(verification&&!buyer.isAdmin)throw new HttpError(403,'Jaribio hili linahitaji ruhusa ya admin.');
+    const buyer=await currentUser(event,{optional:!verification});
+    if(verification&&!buyer?.isAdmin)throw new HttpError(403,'Jaribio hili linahitaji ruhusa ya admin.');
     if(verification&&process.env.SNIPPE_PAYMENTS_ENABLED==='true')throw new HttpError(409,'Jaribio la maandalizi limefungwa. Tumia malipo ya kawaida.');
     const bookId=uuid(b.bookId),checkoutId=uuid(b.checkoutId);
-    const name=clean(b.name,120),email=buyer.email.toLowerCase();
-    const owned=await one('akili_entitlements',eq('user_id',buyer.id)+'&'+eq('book_id',bookId)+'&revoked_at=is.null');
+    const name=clean(b.name,120),email=(buyer?.email||clean(b.email,160)).toLowerCase();
+    const owned=buyer&&(await one('akili_entitlements',eq('user_id',buyer.id)+'&'+eq('book_id',bookId)+'&revoked_at=is.null')||(await experienceReady()?await one('akili_book_grants',eq('user_id',buyer.id)+'&'+eq('book_id',bookId)+'&revoked_at=is.null'):null));
     if(owned)throw new HttpError(409,'Kitabu hiki tayari kipo kwenye maktaba yako.');
     let phone=clean(b.phone,25).replace(/[\s+\-()]/g,'');
     if(phone.startsWith('0'))phone='255'+phone.slice(1);
@@ -59,7 +69,7 @@ async function handle(event){
     const amount=verification?500:book.price_tzs;
     let order=await one('ebook_orders',eq('checkout_id',checkoutId));
     if(order){
-      if(order.user_id!==buyer.id||order.checkout_secret_hash!==sha(b.clientSecret)||order.book_id!==bookId||
+      if(order.user_id!==(buyer?.id||null)||order.checkout_secret_hash!==sha(b.clientSecret)||order.book_id!==bookId||
         order.customer_email!==email||order.customer_phone!==phone||!!order.verification_test!==verification)throw new HttpError(409,'Checkout ID imetumika.');
     } else {
       const limitSince=new Date(Date.now()-15*60*1000).toISOString();
@@ -68,11 +78,11 @@ async function handle(event){
       if(recent.length>=3)throw new HttpError(429,'Umefikia kikomo cha maombi ya malipo. Jaribu baada ya dakika 15.');
       try{
         const found=await insert('ebook_orders',{checkout_id:checkoutId,checkout_secret_hash:sha(b.clientSecret),
-          book_id:bookId,user_id:buyer.id,customer_name:name,customer_email:email,customer_phone:phone,amount_tzs:amount,verification_test:verification});
+          book_id:bookId,user_id:buyer?.id||null,customer_name:name,customer_email:email,customer_phone:phone,amount_tzs:amount,verification_test:verification});
         order=found[0];
       }catch(error){
         order=await one('ebook_orders',eq('checkout_id',checkoutId));
-        if(!order||order.user_id!==buyer.id||order.checkout_secret_hash!==sha(b.clientSecret)||order.book_id!==bookId||order.customer_email!==email||order.customer_phone!==phone||!!order.verification_test!==verification)throw error;
+        if(!order||order.user_id!==(buyer?.id||null)||order.checkout_secret_hash!==sha(b.clientSecret)||order.book_id!==bookId||order.customer_email!==email||order.customer_phone!==phone||!!order.verification_test!==verification)throw error;
       }
     }
     const existing=await one('ebook_payments',eq('order_id',order.id));
@@ -139,10 +149,20 @@ async function handle(event){
     }
     return ok({status,amount_tzs:order.amount_tzs});
   }
+  if(action==='receipt'&&method==='POST'){
+    const b=json(event),order=await one('ebook_orders',eq('id',uuid(b.orderId)));
+    if(!order)throw new HttpError(404,'Oda haijapatikana.');
+    const capability=typeof b.clientSecret==='string'&&/^[0-9a-f]{64}$/.test(b.clientSecret)&&sha(b.clientSecret)===order.checkout_secret_hash;
+    if(!capability){const owner=await currentUser(event);if(order.user_id!==owner.id)throw new HttpError(403,'Oda si ya akaunti hii.');}
+    if(order.status==='paid')await checkBoundOrder(order);
+    const book=await one('ebook_books',eq('id',order.book_id));if(!book)throw new HttpError(404,'Kitabu hakipatikani.');
+    return ok({order:{id:order.id,book_id:order.book_id,amount_tzs:order.amount_tzs,status:order.status,paid_at:order.paid_at,email:order.customer_email,account_bound:!!order.user_id},book:publicBook(book)});
+  }
   if(action==='claim'&&method==='POST'){
     const b=json(event),order=await one('ebook_orders',eq('id',uuid(b.orderId)));
     if(!order||order.checkout_secret_hash!==sha(String(b.clientSecret||''))||order.status!=='paid')
       throw new HttpError(403,'Malipo hayajathibitishwa.');
+    await checkBoundOrder(order);
     return ok({token:await generateAccess(order.id)});
   }
   if(action==='webhook'&&method==='POST'){
@@ -174,16 +194,13 @@ async function handle(event){
       throw new HttpError(403,'Kiungo kimeisha au hakijaruhusiwa.');
     const order=await one('ebook_orders',eq('id',access.order_id));
     if(!order||order.status!=='paid')throw new HttpError(403,'Ununuzi haujathibitishwa.');
-    if(order.user_id){
-      const profile=await one('akili_profiles',eq('user_id',order.user_id),'status');
-      if(profile?.status==='restricted')throw new HttpError(403,'Akaunti hii imesitishwa. Wasiliana na msaada.');
-    }
+    await checkBoundOrder(order);
     const book=await one('ebook_books',eq('id',order.book_id));
     if(!book?.pdf_path)throw new HttpError(404,'PDF haipo.');
     const isDownload=b.purpose==='download';
     if(b.purpose&&!['download','read'].includes(b.purpose))throw new HttpError(400,'Invalid purpose');
     await insert('ebook_access_events',{order_id:order.id,event_type:isDownload?'download_request':'reader_open'});
-    return ok({title:book.title,url:await signFile('ebook-pdfs',book.pdf_path,900),filename:book.slug+'.pdf'});
+    return ok({title:book.title,url:await signFile('ebook-pdfs',book.pdf_path,900),filename:book.slug+'.pdf',slug:book.slug});
   }
   if(action.startsWith('admin-')){
     await adminUser(event);

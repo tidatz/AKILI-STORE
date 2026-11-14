@@ -5,6 +5,7 @@
 
 [functions]
   node_bundler = "esbuild"
+  included_files = ["public/index.html"]
 
 [[redirects]]
   from = "/api"
@@ -13,7 +14,7 @@
 
 [[redirects]]
   from = "/book/*"
-  to = "/index.html"
+  to = "/.netlify/functions/api?action=book-page&slug=:splat"
   status = 200
 
 [[headers]]

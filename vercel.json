@@ -9,7 +9,7 @@
     },
     {
       "source": "/book/:slug",
-      "destination": "/index.html"
+      "destination": "/api?action=book-page&slug=:slug"
     },
     {
       "source": "/books",
@@ -102,6 +102,10 @@
     {
       "source": "/admin/:path*",
       "destination": "/index.html"
+    },
+    {
+      "source": "/join-author",
+      "destination": "/index.html"
     }
   ],
   "headers": [
@@ -154,5 +158,10 @@
       ]
     }
   ],
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "public/index.html"
+    }
+  }
 }
