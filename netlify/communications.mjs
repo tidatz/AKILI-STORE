@@ -20,6 +20,7 @@ export function bulkValues(input){
 }
 export const smsConfigured=()=>!!(process.env.EHUB_API_KEY&&process.env.EHUB_API_SECRET&&process.env.EHUB_WEBHOOK_SECRET&&isUuid(process.env.EHUB_SENDER_ID));
 export const emailConfigured=()=>!!(process.env.RESEND_API_KEY&&process.env.EMAIL_FROM&&process.env.SITE_URL);
+export const invitationEmailConfigured=()=>emailConfigured()||!!(process.env.SUPABASE_URL&&process.env.SUPABASE_PUBLISHABLE_KEY&&process.env.SITE_URL);
 export async function ehub(path,{method='GET',body}={}){
  if(!process.env.EHUB_API_KEY||!process.env.EHUB_API_SECRET)throw new HttpError(503,'Unganisha akaunti ya eHub kwenye usanidi wa server.');
  if(!/^\/(sms\/(send-bulk|send|history|[a-f0-9-]+)|sender-ids(?:\/[a-f0-9-]+)?|wallet\/balance)$/.test(path))throw new HttpError(400,'Huduma ya SMS si sahihi.');
@@ -90,9 +91,16 @@ export async function receiveSms(event){
  await patch('akili_sms_messages',eq('provider_message_id',d.message_id)+'&status=neq.delivered',{status:d.status,error:d.status==='failed'?clean(d.error,300):'',updated_at:new Date().toISOString()});return {received:true};
 }
 export async function emailInvitation(email,token,id){
- if(!emailConfigured())return false;
- const url=siteOrigin()+'/invite?token='+token;
- const response=await fetch('https://api.resend.com/emails',{method:'POST',signal:AbortSignal.timeout(12000),headers:{Authorization:'Bearer '+process.env.RESEND_API_KEY,'Content-Type':'application/json','Idempotency-Key':'author-invitation/'+id},body:JSON.stringify({from:process.env.EMAIL_FROM,to:[email],subject:'Mwaliko wa mwandishi — AKILI STORE',text:'Umealikwa kuchapisha vitabu kwenye AKILI STORE.\n\nFungua kiungo hiki, jisajili au ingia kwa email hii, kisha ukubali mwaliko:\n'+url+'\n\nMwaliko unaisha baada ya siku 7. Ruhusa hii ni ya mwandishi pekee.\n\nAKILI STORE'})});
+ if(!invitationEmailConfigured())return false;
+ let response;
+ if(emailConfigured()){
+  const url=siteOrigin()+'/invite?token='+token;
+  response=await fetch('https://api.resend.com/emails',{method:'POST',signal:AbortSignal.timeout(12000),headers:{Authorization:'Bearer '+process.env.RESEND_API_KEY,'Content-Type':'application/json','Idempotency-Key':'author-invitation/'+id},body:JSON.stringify({from:process.env.EMAIL_FROM,to:[email],subject:'Mwaliko wa mwandishi — AKILI STORE',text:'Umealikwa kuchapisha vitabu kwenye AKILI STORE.\n\nFungua kiungo hiki, jisajili au ingia kwa email hii, kisha ukubali mwaliko:\n'+url+'\n\nMwaliko unaisha baada ya siku 7. Ruhusa hii ni ya mwandishi pekee.\n\nAKILI STORE'})});
+ }else{
+  // Reuse the existing Auth email sender. Opening its one-time sign-in link
+  // still requires explicit acceptance of the verified email's invitation.
+  response=await fetch(process.env.SUPABASE_URL+'/auth/v1/otp?redirect_to='+encodeURIComponent(siteOrigin()+'/auth/callback'),{method:'POST',signal:AbortSignal.timeout(12000),headers:{apikey:process.env.SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,create_user:true})});
+ }
  if(!response.ok)return false;
  await patch('akili_author_invitations',eq('id',id),{email_sent_at:new Date().toISOString()});return true;
 }

@@ -10,7 +10,7 @@ const requestId='55555555-5555-4555-8555-555555555555';
 const originalFetch=global.fetch;
 const env={SUPABASE_URL:'https://database.test',SUPABASE_SERVICE_ROLE_KEY:'server-test',SUPABASE_PUBLISHABLE_KEY:'public-test',EHUB_API_KEY:'key-test',EHUB_API_SECRET:'secret-test',EHUB_SENDER_ID:sender,EHUB_WEBHOOK_SECRET:'webhook-test',SITE_URL:'https://akili.test'};
 const response=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
-async function fixture(callback,{timeout=false,role='admin',saveFails=false}={}){
+async function fixture(callback,{timeout=false,role='admin',saveFails=false,mailStatus=200}={}){
  const previous=Object.fromEntries(Object.keys(env).map(k=>[k,process.env[k]]));Object.assign(process.env,env);
  const state={campaign:null,sends:0,messages:[],calls:[]};
  global.fetch=async(input,opts={})=>{
@@ -24,6 +24,8 @@ async function fixture(callback,{timeout=false,role='admin',saveFails=false}={})
    if(path.endsWith('/wallet/balance'))return response({success:true,data:{sms_balance:32,currency:'TZS'}});
   }
   if(path==='/auth/v1/user')return response({id:uid,email:'qa@example.invalid',email_confirmed_at:'2026-01-01'});
+  if(path==='/auth/v1/otp')return response(mailStatus===200?{}:{msg:'Email delivery unavailable'},mailStatus);
+  if(path==='/rest/v1/akili_author_invitations'&&opts.method==='PATCH')return response([{id:requestId,...body}]);
   if(path==='/rest/v1/ebook_admins')return response(role==='admin'?[{user_id:uid}]:[]);
   if(path==='/rest/v1/akili_profiles')return response([{user_id:uid,email:'qa@example.invalid',role:'reader',status:'active'}]);
   if(path==='/rest/v1/akili_sms_campaigns'){
@@ -86,3 +88,14 @@ test('an invitation never claims an email was sent without a configured email se
  const old=process.env.RESEND_API_KEY;delete process.env.RESEND_API_KEY;
  try{assert.equal(await emailInvitation('author@example.invalid','test',requestId),false);}finally{if(old!==undefined)process.env.RESEND_API_KEY=old;}
 });
+test('author email access reuses the existing Auth sender and a first-party callback',async()=>fixture(async state=>{
+ assert.equal(await emailInvitation('author@example.invalid','invitation-token',requestId),true);
+ const mail=state.calls.find(c=>new URL(c.url).pathname==='/auth/v1/otp');assert.ok(mail);
+ assert.equal(new URL(mail.url).searchParams.get('redirect_to'),'https://akili.test/auth/callback');
+ assert.deepEqual(JSON.parse(mail.body),{email:'author@example.invalid',create_user:true});
+ assert.equal(state.calls.some(c=>new URL(c.url).pathname==='/rest/v1/akili_author_invitations'&&c.method==='PATCH'),true);
+}));
+test('Auth email failure or rate limit is not reported as a sent invitation',async()=>fixture(async state=>{
+ assert.equal(await emailInvitation('author@example.invalid','invitation-token',requestId),false);
+ assert.equal(state.calls.some(c=>new URL(c.url).pathname==='/rest/v1/akili_author_invitations'&&c.method==='PATCH'),false);
+},{mailStatus:429}));

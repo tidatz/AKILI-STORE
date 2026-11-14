@@ -46,9 +46,9 @@ Pending/failed payments must never unlock paid content. The admin has no button 
 
 ## Transactional emails
 
-Authenticated buyers recover purchased books from My Library. Purchase emails link to the authenticated library. Author invitation emails and admin resend require a verified Resend sender and the two server variables `RESEND_API_KEY` / `EMAIL_FROM`. Save the API key as a Secret directly in Vercel; the sender address must belong to a verified Resend domain.
+Authenticated buyers recover purchased books from My Library. Purchase emails link to the authenticated library. Optional branded invitation emails and admin resend use a verified Resend sender and the two server variables `RESEND_API_KEY` / `EMAIL_FROM`. Save the API key as a Secret directly in Vercel; the sender address must belong to a verified Resend domain.
 
-Admin → Watumiaji na waandishi → Alika mwandishi creates a seven-day invitation bound to one email address. The UI reports whether an email was actually accepted by the email provider and offers a manual invitation link. A verified user also sees their own pending invitation on the reader dashboard and explicitly accepts it there. This preserves the workflow when registration email confirmation opens a separate tab. Other emails and expired/used invitations cannot claim the role; an invitation grants author access only.
+Admin → Watumiaji na waandishi → Alika mwandishi creates a seven-day invitation bound to one email address. The UI reports whether an email was actually accepted by the email provider and offers a manual invitation link. If Resend is not configured, invitations reuse the existing Supabase Auth email sender to send a one-time sign-in link. Its SMTP delivery and rate limits still apply; provider errors are reported honestly and the manual invitation link remains available. A verified user also sees their own pending invitation throughout the reader dashboard and explicitly accepts it there. This preserves the workflow when registration email confirmation opens a separate tab. Other emails and expired/used invitations cannot claim the role; an invitation grants author access only.
 
 Supabase Auth handles registration and recovery email separately; verify its sender/delivery settings before inviting a large audience.
 

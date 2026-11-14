@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import {HttpError,clean,isUuid,sha,randomToken,supa,rows,one,insert,patch,eq,assetUrl,signFile,adminUser} from './lib.mjs';
-import {smsConfigured,emailConfigured,bulkValues,sendBulk,smsAccount,emailInvitation,siteOrigin} from './communications.mjs';
+import {smsConfigured,emailConfigured,invitationEmailConfigured,bulkValues,sendBulk,smsAccount,emailInvitation,siteOrigin} from './communications.mjs';
 
 const uuid=value=>{if(!isUuid(value))throw new HttpError(400,'Kitambulisho si sahihi.');return value;};
 const body=event=>{if((event.body||'').length>40000)throw new HttpError(413,'Taarifa ni nyingi.');try{return JSON.parse(event.body||'{}');}catch{throw new HttpError(400,'Taarifa si sahihi.');}};
@@ -223,7 +223,7 @@ export async function marketplace(event,action){
    siteOrigin();
    const token=randomToken();const invite=await insert('akili_author_invitations',{email,token_hash:sha(token),invited_by:u.id});
    let email_sent=false;try{email_sent=await emailInvitation(email,token,invite[0].id);}catch{console.error('Author invitation email not confirmed');}
-   await audit(u,'author.invited',invite[0].id,{email,email_sent});return {token,email,email_sent,email_configured:emailConfigured()};
+   await audit(u,'author.invited',invite[0].id,{email,email_sent});return {token,email,email_sent,email_type:emailConfigured()?'invitation':'auth_link',email_configured:invitationEmailConfigured()};
  }
  if(action==='market-admin-sms-data'&&method==='GET'){
    const campaigns=await rows('akili_sms_campaigns','select=*&order=created_at.desc&limit=60');
