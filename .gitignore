@@ -4,4 +4,8 @@
 .netlify/
 node_modules/
 public/vendor/pdfjs/
+public/favicon.png
+public/apple-touch-icon.png
+public/assets/akili-store-logo.png
+public/assets/akili-store-icon-*.png
 .DS_Store

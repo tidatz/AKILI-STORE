@@ -14,4 +14,6 @@
 .reader-toolbar #download{color:var(--red)}
 .reader-message{max-width:480px;line-height:1.7}
 #reader-login{display:inline-flex;align-items:center;justify-content:center;margin:10px}
+.reader-brand{display:flex;align-items:center;flex:none}
+.reader-brand img{width:38px;height:32px;object-fit:contain;display:block}
 @media(max-width:680px){.reader-actions{gap:12px;text-align:left;font-size:11px}.reader-actions .secondary-button{min-width:105px;flex:none}.reader-toolbar{flex-wrap:wrap;gap:9px}.reader-toolbar h1{order:3;flex-basis:100%;max-width:100%;margin:0;text-align:center}}
