@@ -10,7 +10,7 @@ export async function config(){
 async function auth(path,body,token){
  const c=await config();if(!c.supabase_url||!c.publishable_key)throw Error('Huduma ya akaunti haipatikani kwa sasa.');
  const r=await fetch(c.supabase_url+'/auth/v1/'+path,{method:body?'POST':'GET',headers:{apikey:c.publishable_key,...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
- const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error_description||j.msg||j.message||'Imeshindikana. Jaribu tena.');return j;
+ const j=await r.json().catch(()=>({}));if(!r.ok){const e=Error(j.error_description||j.msg||j.message||'Imeshindikana. Jaribu tena.');e.status=r.status;throw e;}return j;
 }
 export async function api(action,body,retry=true){
  let s=session();
@@ -22,7 +22,18 @@ export async function api(action,body,retry=true){
  if(!r.ok){const e=Error(j.error||'Imeshindikana. Jaribu tena.');e.status=r.status;throw e;}return j;
 }
 async function refresh(){
- if(!refreshPromise)refreshPromise=(async()=>{const s=session();if(!s?.refresh_token)throw Error('Ingia tena.');try{saveSession(await auth('token?grant_type=refresh_token',{refresh_token:s.refresh_token}));}catch(e){sessionStorage.removeItem(storageKey);throw e;}})().finally(()=>{refreshPromise=null;});
+ if(!refreshPromise)refreshPromise=(async()=>{
+  const s=session();
+  if(!s?.refresh_token){const e=Error('Muda wa kuingia umeisha. Ingia tena.');e.status=401;throw e;}
+  try{saveSession(await auth('token?grant_type=refresh_token',{refresh_token:s.refresh_token}));}
+  catch(error){
+   if([400,401,403].includes(error.status)){
+    sessionStorage.removeItem(storageKey);const e=Error('Muda wa kuingia umeisha. Ingia tena.');e.status=401;throw e;
+   }
+   // A temporary outage must not discard a valid session or a saved checkout.
+   const e=Error('Huduma ya akaunti haijapatikana. Jaribu tena.');e.status=error.status||503;throw e;
+  }
+ })().finally(()=>{refreshPromise=null;});
  return refreshPromise;
 }
 export async function login(email,password){saveSession(await auth('token?grant_type=password',{email,password}));}

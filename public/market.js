@@ -139,7 +139,7 @@ async function render(){
   if(path.startsWith('/checkout/'))resumePayment(path.split('/')[2]);
  }catch(e){
   if(sequence!==routeSequence)return;
-  if(e.status===401){await signout();me=null;return navigate('/login?next='+encodeURIComponent(location.pathname),true);}
+  if(e.status===401){await signout();me=null;return navigate('/login?next='+encodeURIComponent(location.pathname+location.search),true);}
   $('#app').innerHTML=publicPage(`<div class="container section">${empty('Hatukuweza kufungua sehemu hii',e.message,btn('retry','Jaribu tena','','btn','arrow'),'help')}</div>`);
  }
 }
