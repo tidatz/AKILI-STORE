@@ -22,10 +22,12 @@ const bookCell=b=>`<div class="book-cell">${cover(b)}<div><span class="cell-titl
 let catalog=null,me=null,adminData=null,authorData=null,libraryData=null,paymentTimer=null,toastTimer=null,routeSequence=0;
 const authDestination=value=>{const target=safeNext(value||defaultRoute());return /^\/(auth\/callback|login|register|forgot-password)(?:[/?#]|$)/.test(target)?defaultRoute():target;};
 const defaultRoute=()=>me?.role==='admin'?'/admin':me?.role==='author'?'/author-dashboard':'/';
-const ownedBook=id=>libraryData?.books.some(b=>b.id===id);
+const guestBook=id=>{if(me)return null;try{const r=JSON.parse(sessionStorage.getItem('akili-receipt')||'null');return r?.bookId===id&&/^[a-f0-9]{64}$/.test(r.token||'')?r:null;}catch{return null;}};
+const ownedBook=id=>libraryData?.books.some(b=>b.id===id)||!!guestBook(id);
+const readPath=b=>guestBook(b.id)?'/reader.html?token='+guestBook(b.id).token:'/reader.html?book='+b.id;
 const bookPath=b=>'/book/'+encodeURIComponent(b.slug);
 const checkoutPath=b=>'/checkout/'+encodeURIComponent(b.slug);
-const bookAction=(b,cls='btn primary')=>link(ownedBook(b.id)?'/reader.html?book='+b.id:checkoutPath(b),ownedBook(b.id)?'Soma kitabu':'Nunua kitabu',cls,ownedBook(b.id)?'book':'arrow');
+const bookAction=(b,cls='btn primary')=>link(ownedBook(b.id)?readPath(b):checkoutPath(b),ownedBook(b.id)?'Soma kitabu':'Nunua kitabu',cls,ownedBook(b.id)?'book':'arrow');
 const returnTarget=()=>{const q=new URLSearchParams(location.search);return /^\/(login|register|forgot-password)$/.test(location.pathname)?q.get('next')||'':location.pathname+location.search+location.hash;};
 const authPath=mode=>'/'+mode+(returnTarget()?'?next='+encodeURIComponent(returnTarget()):'');
 let firstPaint=true;const introDeadline=sessionStorage.getItem('akili-intro')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?0:performance.now()+2200;
@@ -155,7 +157,7 @@ async function render(){
   else if(path==='/profile-settings')content=profileView();
   else if(path==='/help'){const d=me?await api('market-support'):{tickets:[]};content=supportView(d.tickets);}
   else if(path==='/platform-policies')content=policies();
-  else if(path.startsWith('/checkout/')){const key=decodeURIComponent(path.split('/')[2]),book=catalog.books.find(b=>b.id===key||b.slug===key);if(!book)throw Error('Kitabu hakijapatikana.');if(new URLSearchParams(location.search).get('verify')==='1'&&me?.role!=='admin')content=verificationAccountView();else if(ownedBook(book.id))return navigate('/reader.html?book='+book.id,true);else content=checkoutView(book);}
+  else if(path.startsWith('/checkout/')){const key=decodeURIComponent(path.split('/')[2]),book=catalog.books.find(b=>b.id===key||b.slug===key);if(!book)throw Error('Kitabu hakijapatikana.');if(new URLSearchParams(location.search).get('verify')==='1'&&me?.role!=='admin')content=verificationAccountView();else if(ownedBook(book.id))return navigate(readPath(book),true);else content=checkoutView(book);}
   else if(path==='/join-author'){const token=new URLSearchParams(location.search).get('token')||'';const invitation=await api('author-link',{token});content=publicPage(authorJoin(invitation,me,token));}
   else if(path==='/invite'){const token=new URLSearchParams(location.search).get('token')||'';content=dashboard(heading('Mwaliko wa mwandishi','Karibu kuchapisha maarifa yako kwenye AKILI STORE.')+`<section class="panel"><h2>Kubali mwaliko</h2><p class="muted small">Akaunti yako: ${h(me.email)}. Mwaliko utakubaliwa ikiwa email hii ndiyo iliyoalikwa na muda haujaisha.</p>${btn('accept-invite','Kubali na fungua eneo la mwandishi',token,'btn primary','check')}</section>`,'Mwaliko');}
   else if(isAdmin){const d=await getAdmin();if(path==='/admin')content=adminHome(d);else if(path==='/admin/books')content=booksManage(d,true);else if(path.startsWith('/admin/books/')){const id=path.split('/')[3],b=id==='new'?{}:d.books.find(b=>b.id===id);if(!b)throw Error('Kitabu hakijapatikana.');content=editor(b,true);}else if(['/admin/users','/admin/authors'].includes(path))content=usersView(d);else if(['/admin/orders','/admin/payments'].includes(path))content=dashboard(heading('Mauzo na malipo','Manunuzi na uthibitisho wa malipo.',paymentActions(d))+`<section class="panel">${ordersTable(d.orders,true)}</section>`,'Mauzo na malipo','admin');else if(['/admin/withdrawals','/admin/reports'].includes(path))content=financeView(d,true);else if(path==='/admin/support')content=supportView(d.tickets,true);else if(path==='/admin/settings')content=settingsView(d);else if(path==='/admin/messages')content=smsView(await api('market-admin-sms-data'));else if(path==='/admin/reviews')content=booksManage(d,true);}
