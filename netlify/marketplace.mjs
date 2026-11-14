@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import {HttpError,clean,isUuid,sha,randomToken,supa,rows,one,insert,patch,eq,assetUrl,signFile,adminUser} from './lib.mjs';
+import {smsConfigured,emailConfigured,bulkValues,sendBulk,smsAccount,emailInvitation,siteOrigin} from './communications.mjs';
 
 const uuid=value=>{if(!isUuid(value))throw new HttpError(400,'Kitambulisho si sahihi.');return value;};
 const body=event=>{if((event.body||'').length>40000)throw new HttpError(413,'Taarifa ni nyingi.');try{return JSON.parse(event.body||'{}');}catch{throw new HttpError(400,'Taarifa si sahihi.');}};
@@ -22,6 +23,7 @@ export async function currentUser(event,{optional=false}={}){
  }
  u.isAdmin=!!admin;
  if(u.profile.status!=='active')throw new HttpError(403,'Akaunti hii imesitishwa. Wasiliana na msaada.');
+ if(u.profile.email!==u.email.toLowerCase())await patch('akili_profiles',eq('user_id',u.id),{email:u.email.toLowerCase()});
  return u;
 }
 const audit=(u,action,target,details={})=>insert('akili_audit_logs',{actor_id:u.id,action,target_id:target||null,details});
@@ -91,7 +93,10 @@ export async function marketplace(event,action){
  }
  if(!action.startsWith('market-'))return undefined;
  const u=await currentUser(event),b=method==='POST'?body(event):{};
- if(action==='market-me'&&method==='GET')return {user:safeUser(u)};
+ if(action==='market-me'&&method==='GET'){
+   const pending=!u.isAdmin&&u.profile.role==='reader'?await one('akili_author_invitations',eq('email',u.email.toLowerCase())+'&accepted_at=is.null&expires_at=gt.'+encodeURIComponent(new Date().toISOString())+'&order=created_at.desc','id'):null;
+   return {user:{...safeUser(u),author_invitation:pending?.id||null}};
+ }
  if(action==='market-profile'&&method==='POST'){
    const display_name=clean(b.display_name,100);if(display_name.length<2)throw new HttpError(400,'Jaza jina lako.');
    await patch('akili_profiles',eq('user_id',u.id),{display_name,phone:clean(b.phone,25),bio:clean(b.bio,1500)});
@@ -138,6 +143,12 @@ export async function marketplace(event,action){
  if(action==='market-accept-invite'&&method==='POST'){
    if(!/^[a-f0-9]{64}$/.test(b.token||''))throw new HttpError(400,'Mwaliko si sahihi.');
    await supa('/rest/v1/rpc/akili_accept_invitation',{method:'POST',body:{p_user_id:u.id,p_token_hash:sha(b.token)}});await audit(u,'author.accepted');return {accepted:true};
+ }
+ if(action==='market-accept-email-invite'&&method==='POST'){
+   const invite=await one('akili_author_invitations',eq('id',uuid(b.id)));
+   if(!invite||invite.email.toLowerCase()!==u.email.toLowerCase()||invite.accepted_at||Date.parse(invite.expires_at)<=Date.now())throw new HttpError(403,'Mwaliko huu haujaidhinishwa kwa email yako au umeisha.');
+   await supa('/rest/v1/rpc/akili_accept_invitation',{method:'POST',body:{p_user_id:u.id,p_token_hash:invite.token_hash}});
+   await audit(u,'author.accepted',invite.id);return {accepted:true};
  }
  if(action==='market-author-data'&&method==='GET'){
    authorizeAuthor(u);
@@ -187,13 +198,13 @@ export async function marketplace(event,action){
  if(!action.startsWith('market-admin-'))throw new HttpError(404,'Huduma haijapatikana.');
  if(!u.isAdmin)throw new HttpError(403,'Huna ruhusa ya admin.');
  if(action==='market-admin-data'&&method==='GET'){
-   const [books,profiles,orders,withdrawals,tickets,reviews,audits,settings,ledger]=await Promise.all([
+   const [books,profiles,orders,withdrawals,tickets,reviews,audits,settings,ledger,invitations]=await Promise.all([
      rows('ebook_books','select=*&order=created_at.desc'),rows('akili_profiles','select=*&order=created_at.desc&limit=300'),
      rows('ebook_orders','select=id,book_id,customer_name,customer_email,customer_phone,amount_tzs,status,created_at,paid_at&order=created_at.desc&limit=300'),
      rows('akili_withdrawals','select=*&order=created_at.desc&limit=200'),rows('akili_support_tickets','select=*&order=created_at.desc&limit=200'),
      rows('akili_reviews','select=*&order=created_at.desc&limit=200'),rows('akili_audit_logs','select=*&order=created_at.desc&limit=100'),
-     one('ebook_site_settings','id=eq.1'),rows('akili_ledger','select=*&order=created_at.desc&limit=1000')]);
-   return {books:books.map(x=>({...x,cover_url:assetUrl(x.cover_path)})),profiles,orders,withdrawals,tickets,reviews,audits,settings,ledger,
+     one('ebook_site_settings','id=eq.1'),rows('akili_ledger','select=*&order=created_at.desc&limit=1000'),rows('akili_author_invitations','select=id,email,expires_at,accepted_at,email_sent_at,created_at&order=created_at.desc&limit=100')]);
+   return {books:books.map(x=>({...x,cover_url:assetUrl(x.cover_path)})),profiles,orders,withdrawals,tickets,reviews,audits,settings,ledger,invitations,
      integration:{database:true,storage:!!process.env.SUPABASE_SERVICE_ROLE_KEY,snippe:!!process.env.SNIPPE_API_KEY,webhook:!!process.env.SNIPPE_WEBHOOK_SECRET,payments_enabled:process.env.SNIPPE_PAYMENTS_ENABLED==='true',email:!!(process.env.RESEND_API_KEY&&process.env.EMAIL_FROM)}};
  }
  if(action==='market-admin-moderate'&&method==='POST'){
@@ -207,8 +218,22 @@ export async function marketplace(event,action){
  }
  if(action==='market-admin-invite'&&method==='POST'){
    const email=clean(b.email,160).toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new HttpError(400,'Email si sahihi.');
+   const recent=await rows('akili_author_invitations','select=id&'+eq('email',email)+'&created_at=gte.'+encodeURIComponent(new Date(Date.now()-3600000).toISOString()));
+   if(recent.length>=3)throw new HttpError(429,'Mialiko ya email hii tayari imetumwa. Subiri kabla ya kujaribu tena.');
+   siteOrigin();
    const token=randomToken();const invite=await insert('akili_author_invitations',{email,token_hash:sha(token),invited_by:u.id});
-   await audit(u,'author.invited',invite[0].id,{email});return {token,email};
+   let email_sent=false;try{email_sent=await emailInvitation(email,token,invite[0].id);}catch{console.error('Author invitation email not confirmed');}
+   await audit(u,'author.invited',invite[0].id,{email,email_sent});return {token,email,email_sent,email_configured:emailConfigured()};
+ }
+ if(action==='market-admin-sms-data'&&method==='GET'){
+   const campaigns=await rows('akili_sms_campaigns','select=*&order=created_at.desc&limit=60');
+   const totals=campaigns.length?await rows('akili_sms_delivery_totals','select=*&campaign_id=in.('+campaigns.map(c=>c.id).join(',')+')'):[];
+   return {configured:smsConfigured(),campaigns:campaigns.map(({recipients,fingerprint,...c})=>({...c,recipient_count:recipients.length,delivered:totals.find(t=>t.campaign_id===c.id)?.delivered||0,failed:totals.find(t=>t.campaign_id===c.id)?.failed||0}))};
+ }
+ if(action==='market-admin-sms-preview'&&method==='POST')return {...bulkValues(b),configured:smsConfigured()};
+ if(action==='market-admin-sms-account'&&method==='GET')return smsAccount();
+ if(action==='market-admin-sms-send'&&method==='POST'){
+   const result=await sendBulk(u,b);await audit(u,'sms.submitted',result.campaign.id,{recipients:result.campaign.recipients.length});return {accepted:result.campaign.status==='accepted'};
  }
  if(action==='market-admin-user'&&method==='POST'){
    const id=uuid(b.userId);if(id===u.id||await one('ebook_admins',eq('user_id',id)))throw new HttpError(409,'Huwezi kusitisha akaunti ya admin.');
@@ -232,8 +257,8 @@ export async function marketplace(event,action){
    if(!result.length)throw new HttpError(409,'Ombi hili tayari limeshughulikiwa.');await audit(u,'withdrawal.'+b.status,b.id,{reference,note});await notify(result[0].user_id,'Hali ya ombi la kutoa pesa',b.status==='paid'?'Ombi lako limelipwa.':'Ombi lako limekataliwa: '+note,'/withdrawal-request');return {saved:true};
  }
  if(action==='market-admin-settings'&&method==='POST'){
-   const v={hero_title:clean(b.hero_title,180),hero_description:clean(b.hero_description,600),support_email:clean(b.support_email,160),contact:clean(b.contact,500),about_author:clean(b.about_author,10000),contents:clean(b.contents,10000),published_at:new Date().toISOString()};
-   if(!v.hero_title||!/^#[a-f0-9]{6}$/i.test(b.primary_color)||!/^\S+@\S+\.\S+$/.test(v.support_email))throw new HttpError(400,'Kichwa, rangi au email si sahihi.');
+   const v={support_email:clean(b.support_email,160),contact:clean(b.contact,500),about_author:clean(b.about_author,10000),contents:clean(b.contents,10000),published_at:new Date().toISOString()};
+   if(!/^#[a-f0-9]{6}$/i.test(b.primary_color)||!/^\S+@\S+\.\S+$/.test(v.support_email))throw new HttpError(400,'Kichwa, rangi au email si sahihi.');
    v.primary_color=b.primary_color;await patch('ebook_site_settings','id=eq.1',v);await audit(u,'settings.updated');return {saved:true};
  }
  throw new HttpError(404,'Huduma haijapatikana.');

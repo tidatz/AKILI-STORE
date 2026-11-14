@@ -13,7 +13,7 @@ function render(b){
   $('#price').textContent=money(b.price_tzs);$('#buy').textContent=site.settings.buy_label||'NUNUA SASA';
   const cover=$('#book-cover');cover.querySelector('img')?.remove();
   if(b.cover_url){const img=document.createElement('img');img.alt='Jalada la '+b.title;img.src=b.cover_url;cover.append(img);$('#cover-fallback').hidden=true}else $('#cover-fallback').hidden=false;
-  document.title=b.title;
+  document.title='AKILI STORE';
   const nav=$('#menu');nav.replaceChildren();
   for(const [defaultLabel,key,menuKey] of menuItems){
     const label=site.settings[menuKey]||defaultLabel;

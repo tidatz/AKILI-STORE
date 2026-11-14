@@ -67,7 +67,7 @@ async function openBook(){
   if(!bookId&&!/^[a-f0-9]{64}$/.test(token||'')){message('Kiungo cha kitabu hakipo au si sahihi.');return}
   try{
     details=await request('read');
-    $('#reader-title').textContent=details.title;document.title=details.title;
+    $('#reader-title').textContent=details.title;document.title='AKILI STORE';
     const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs');
     pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
     pdf=await pdfjs.getDocument({url:details.url}).promise;

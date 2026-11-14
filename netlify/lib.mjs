@@ -114,12 +114,12 @@ export async function emailAccess(order,force=false) {
   if(order.email_sent_at&&!force) return true;
   const book=await one('ebook_books',eq('id',order.book_id),'title');
   if(!book) throw new HttpError(404,'Kitabu hakipo.');
-  const token=await generateAccess(order.id);
-  const link=process.env.SITE_URL.replace(/\/$/,'')+'/reader.html?token='+token;
+  const link=process.env.SITE_URL.replace(/\/$/,'')+'/my-library';
   const response=await fetch('https://api.resend.com/emails',{method:'POST',
-    headers:{Authorization:'Bearer '+process.env.RESEND_API_KEY,'Content-Type':'application/json'},
+    signal:AbortSignal.timeout(12000),
+    headers:{Authorization:'Bearer '+process.env.RESEND_API_KEY,'Content-Type':'application/json','Idempotency-Key':force?'access-resend/'+order.id+'/'+randomToken().slice(0,12):'access/'+order.id},
     body:JSON.stringify({from:process.env.EMAIL_FROM,to:[order.customer_email],
-      subject:'Kiungo cha kusoma kitabu chako',text:'Malipo yako yamethibitishwa. Kitabu: '+book.title+'\nFungua hapa: '+link+'\nKiungo hiki kinaisha baada ya siku 30.'})});
+      subject:'Kitabu chako — AKILI STORE',text:'Malipo yako yamethibitishwa. Kitabu: '+book.title+'\n\nFungua maktaba yako: '+link+'\nIngia au jisajili kwa email hii ili kusoma kitabu chako.\n\nAKILI STORE'})});
   if(!response.ok) {console.error('Email provider failed',response.status);return false;}
   await patch('ebook_orders',eq('id',order.id),{email_sent_at:new Date().toISOString()});
   return true;

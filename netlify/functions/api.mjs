@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {HttpError,sha,randomToken,isUuid,clean,supa,rows,insert,patch,remove,eq,one,assetUrl,signFile,adminUser,snippe,verifyWebhook,applyPayment,generateAccess,emailAccess} from '../lib.mjs';
 import {marketplace,currentUser,validatePublication} from '../marketplace.mjs';
+import {receiveSms,paidSms} from '../communications.mjs';
 
 const ok=(data,status=200)=>({statusCode:status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
 const fail=(status,message)=>ok({error:message},status);
@@ -14,13 +15,14 @@ async function handle(event){
   const method=event.httpMethod;
   const action=new URLSearchParams(event.queryStringParameters?new URLSearchParams(event.queryStringParameters):'').get('action')||'';
   if(method==='OPTIONS')return{statusCode:204,body:''};
-  if(method==='POST'&&action!=='webhook'){
+  if(method==='POST'&&!['webhook','sms-webhook'].includes(action)){
     const origin=event.headers.origin||event.headers.Origin;
     const host=event.headers.host||event.headers.Host;
     if(origin&&host&&new URL(origin).host!==host)throw new HttpError(403,'Origin haijaruhusiwa.');
   }
   const marketResult=await marketplace(event,action);
   if(marketResult!==undefined)return ok(marketResult);
+  if(action==='sms-webhook'&&method==='POST')return ok(await receiveSms(event));
   if(action==='config'&&method==='GET')return ok({
     supabase_url:process.env.SUPABASE_URL||'',publishable_key:process.env.SUPABASE_PUBLISHABLE_KEY||''
   });
@@ -115,6 +117,7 @@ async function handle(event){
               const paidOrder=await one('ebook_orders',eq('id',order.id));
               await emailAccess(paidOrder);
             }
+            if(verified==='completed')await paidSms(await one('ebook_orders',eq('id',order.id)));
           } catch(error){
             // An outage or pending API response must never invent a paid state.
             console.error('Snippe verification unavailable',error?.status||'provider_error');
@@ -134,6 +137,7 @@ async function handle(event){
   }
   if(action==='webhook'&&method==='POST'){
     const payload=verifyWebhook(event);
+    if(!['payment.completed','payment.failed','payment.expired','payment.voided'].includes(payload.type||payload.event))return ok({received:true,ignored:true});
     const data=payload.data||payload;
     const reference=clean(data.reference,200);
     const payment=await one('ebook_payments',eq('provider_reference',reference));
@@ -146,6 +150,7 @@ async function handle(event){
     if(verified==='completed'){
       const order=await one('ebook_orders',eq('id',payment.order_id));
       const sent=await emailAccess(order);
+      await paidSms(order);
       if(process.env.RESEND_API_KEY&&process.env.EMAIL_FROM&&!sent)
         throw new HttpError(503,'Email delivery retry required');
     }

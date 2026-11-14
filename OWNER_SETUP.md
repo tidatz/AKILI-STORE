@@ -25,9 +25,9 @@ Completed in Supabase Authentication → URL Configuration:
 - Exact callbacks saved: `https://www.akilistore.com/auth/callback`, `https://akilistore.com/auth/callback`, and `https://ebook-sales-website-development.vercel.app/auth/callback`.
 - The existing v0 application redirect was preserved; no wildcard or preview access was added.
 
-Google is still **disabled**, with no Client ID or Secret configured. Remaining steps:
+Google is now **enabled** in Supabase. The user supplied the OAuth credentials directly; they were not read or copied by the agent. Remaining branding and verification steps:
 1. Create/select the Google OAuth web client. Add `https://www.akilistore.com` as the authorized JavaScript origin. Authorized redirect URI: `https://rtowgcggjmtszziqgmux.supabase.co/auth/v1/callback`.
-2. Enter the Google client ID and secret directly in Supabase Authentication → Sign In / Providers → Google, then enable the provider. Do not share the secret in chat or source files.
+2. In Google Auth Platform → Branding, use **AKILI STORE** as the app name and complete the brand verification requirements. The Google Cloud branding page was unavailable in the agent browser, so this external name change has not been completed. Google controls approval and propagation; a website title change alone cannot replace the Supabase project hostname on Google's screen. Do not rotate the working OAuth credentials just to change the display name.
 3. Verify registration, email confirmation/recovery and Google sign-in from the production domain. The Google button becomes available when Supabase reports the provider enabled. Verify the owner lands on `/admin` and a normal reader cannot open admin APIs.
 
 The existing verified owner `tidatzacademy@gmail.com` has the admin database permission. Its existing email/password login was verified end to end on the custom domain and opened `/admin`. No password was reset or replaced. Public Google sign-in and registration-email delivery still require their separate verification.
@@ -38,7 +38,7 @@ In Vercel project `mifumoyabiashara`, Production config variables `SITE_URL=http
 
 1. Add server-only `SNIPPE_API_KEY` and `SNIPPE_WEBHOOK_SECRET` directly in Vercel as Secret variables, scoped to Production. Never paste these values into chat or commit them. Redeploy after saving. Keep `SNIPPE_PAYMENTS_ENABLED=false` during connection verification.
 2. Set Snippe callback to `https://www.akilistore.com/api?action=webhook` and register the correct signing secret.
-3. Use Admin → Settings → Check Snippe Connection. This verifies the provider account connection; it does not prove a successful purchase.
+3. Use Admin → Mauzo na malipo → Thibitisha muunganisho. This verifies the provider account connection; it does not prove a successful purchase. The old service-status panel has been removed from Settings.
 4. Use the provider-supported test environment to verify completed, pending and failed payments, amount mismatch, duplicate callback, library entitlement and PDF reading/download. Verify public webhook access without deployment authentication.
 5. Activate only after those checks pass, then redeploy production. Perform an agreed, controlled live transaction and reconcile the provider reference against the order and ledger.
 
@@ -46,4 +46,12 @@ Pending/failed payments must never unlock paid content. The admin has no button 
 
 ## Transactional emails
 
-Authenticated buyers can recover purchased books from My Library. Optional direct access emails and admin resend require a verified Resend sender and the two server variables `RESEND_API_KEY` / `EMAIL_FROM`. Supabase Auth handles registration and recovery email separately; verify its sender/delivery settings before inviting a large audience.
+Authenticated buyers recover purchased books from My Library. Purchase emails link to the authenticated library. Author invitation emails and admin resend require a verified Resend sender and the two server variables `RESEND_API_KEY` / `EMAIL_FROM`. Save the API key as a Secret directly in Vercel; the sender address must belong to a verified Resend domain.
+
+Admin → Watumiaji na waandishi → Alika mwandishi creates a seven-day invitation bound to one email address. The UI reports whether an email was actually accepted by the email provider and offers a manual invitation link. A verified user also sees their own pending invitation on the reader dashboard and explicitly accepts it there. This preserves the workflow when registration email confirmation opens a separate tab. Other emails and expired/used invitations cannot claim the role; an invitation grants author access only.
+
+Supabase Auth handles registration and recovery email separately; verify its sender/delivery settings before inviting a large audience.
+
+## Bulk SMS
+
+See [EHUB_SETUP.md](EHUB_SETUP.md). The SMS admin page, signed API client, protected campaign records and delivery webhook are implemented. Provider credentials, an approved sender ID, the webhook registration and a controlled live delivery check are still required. No real messages have been sent during development.
