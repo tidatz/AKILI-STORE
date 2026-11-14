@@ -34,12 +34,12 @@ The existing verified owner `tidatzacademy@gmail.com` has the admin database per
 
 ## Snippe
 
-In Vercel project `mifumoyabiashara`, Production config variables `SITE_URL=https://www.akilistore.com` and `SNIPPE_PAYMENTS_ENABLED=false` have been saved. The `SNIPPE_API_KEY` and `SNIPPE_WEBHOOK_SECRET` variable names are now present; their values were not revealed and their connection has not yet been verified. Live payments remain disabled.
+In Vercel project `mifumoyabiashara`, Production config variables `SITE_URL=https://www.akilistore.com` and `SNIPPE_PAYMENTS_ENABLED=false` have been saved. The `SNIPPE_API_KEY` and `SNIPPE_WEBHOOK_SECRET` variable names are now present; their values were not revealed and the live API connection was successfully verified from Admin → Mauzo na malipo on 14 November 2026. The payment, matching signed webhook and final library delivery still need the controlled launch purchase. Public sales remain disabled.
 
 1. Add server-only `SNIPPE_API_KEY` and `SNIPPE_WEBHOOK_SECRET` directly in Vercel as Secret variables, scoped to Production. Never paste these values into chat or commit them. Redeploy after saving. Keep `SNIPPE_PAYMENTS_ENABLED=false` during connection verification.
 2. Set Snippe callback to `https://www.akilistore.com/api?action=webhook` and register the correct signing secret.
 3. Use Admin → Mauzo na malipo → Thibitisha muunganisho. This verifies the provider account connection; it does not prove a successful purchase. The old service-status panel has been removed from Settings.
-4. Use the provider-supported test environment to verify completed, pending and failed payments, amount mismatch, duplicate callback, library entitlement and PDF reading/download. Verify public webhook access without deployment authentication.
+4. Use **Mauzo na malipo → Jaribu malipo · TSh 500** for the owner-approved real launch purchase while public sales remain closed. This is admin-only, fixed at TSh 500 server-side, and labelled as a verification order. Verify the authentic webhook event, paid order, amount, entitlement, ledger and PDF reading/download before activation. The public book price remains TSh 25,000. See [SNIPPE_SETUP.md](SNIPPE_SETUP.md).
 5. Activate only after those checks pass, then redeploy production. Perform an agreed, controlled live transaction and reconcile the provider reference against the order and ledger.
 
 Pending/failed payments must never unlock paid content. The admin has no button that invents a successful payment.

@@ -37,26 +37,30 @@ async function handle(event){
       featured:featured?publishBook(featured):null,books:books.map(publishBook)});
   }
   if(action==='checkout'&&method==='POST'){
-    if(process.env.SNIPPE_PAYMENTS_ENABLED!=='true')
+    const b=json(event),verification=b.verification===true;
+    if(process.env.SNIPPE_PAYMENTS_ENABLED!=='true'&&!verification)
       throw new HttpError(503,'Malipo hayajawashwa. Uthibitishaji wa mwisho bado unahitajika.');
     const buyer=await currentUser(event);
-    const b=json(event),bookId=uuid(b.bookId),checkoutId=uuid(b.checkoutId);
+    if(verification&&!buyer.isAdmin)throw new HttpError(403,'Jaribio hili linahitaji ruhusa ya admin.');
+    if(verification&&process.env.SNIPPE_PAYMENTS_ENABLED==='true')throw new HttpError(409,'Jaribio la maandalizi limefungwa. Tumia malipo ya kawaida.');
+    const bookId=uuid(b.bookId),checkoutId=uuid(b.checkoutId);
     const name=clean(b.name,120),email=buyer.email.toLowerCase();
     const owned=await one('akili_entitlements',eq('user_id',buyer.id)+'&'+eq('book_id',bookId)+'&revoked_at=is.null');
     if(owned)throw new HttpError(409,'Kitabu hiki tayari kipo kwenye maktaba yako.');
     let phone=clean(b.phone,25).replace(/[\s+\-()]/g,'');
     if(phone.startsWith('0'))phone='255'+phone.slice(1);
-    if(!/^255\d{9}$/.test(phone)||!/^\S+@\S+\.\S+$/.test(email)||name.length<2||typeof b.clientSecret!=='string'||!/^[0-9a-f]{64}$/.test(b.clientSecret))
+    if(!/^255[67]\d{8}$/.test(phone)||!/^\S+@\S+\.\S+$/.test(email)||name.length<2||typeof b.clientSecret!=='string'||!/^[0-9a-f]{64}$/.test(b.clientSecret))
       throw new HttpError(400,'Jaza jina, email na namba sahihi ya simu.');
     if(!process.env.SNIPPE_API_KEY||!process.env.SNIPPE_WEBHOOK_SECRET||!process.env.SITE_URL)
       throw new HttpError(503,'Malipo bado hayajaunganishwa. Wasiliana na msimamizi.');
     const book=await one('ebook_books',eq('id',bookId));
     if(!book||book.status!=='published'||!book.pdf_path)
       throw new HttpError(409,'Kitabu bado hakijawa tayari kwa mauzo.');
+    const amount=verification?500:book.price_tzs;
     let order=await one('ebook_orders',eq('checkout_id',checkoutId));
     if(order){
       if(order.user_id!==buyer.id||order.checkout_secret_hash!==sha(b.clientSecret)||order.book_id!==bookId||
-        order.customer_email!==email||order.customer_phone!==phone)throw new HttpError(409,'Checkout ID imetumika.');
+        order.customer_email!==email||order.customer_phone!==phone||!!order.verification_test!==verification)throw new HttpError(409,'Checkout ID imetumika.');
     } else {
       const limitSince=new Date(Date.now()-15*60*1000).toISOString();
       const recent=await rows('ebook_orders','select=id&'+eq('customer_phone',phone)+
@@ -64,11 +68,11 @@ async function handle(event){
       if(recent.length>=3)throw new HttpError(429,'Umefikia kikomo cha maombi ya malipo. Jaribu baada ya dakika 15.');
       try{
         const found=await insert('ebook_orders',{checkout_id:checkoutId,checkout_secret_hash:sha(b.clientSecret),
-          book_id:bookId,user_id:buyer.id,customer_name:name,customer_email:email,customer_phone:phone,amount_tzs:book.price_tzs});
+          book_id:bookId,user_id:buyer.id,customer_name:name,customer_email:email,customer_phone:phone,amount_tzs:amount,verification_test:verification});
         order=found[0];
       }catch(error){
         order=await one('ebook_orders',eq('checkout_id',checkoutId));
-        if(!order||order.checkout_secret_hash!==sha(b.clientSecret))throw error;
+        if(!order||order.user_id!==buyer.id||order.checkout_secret_hash!==sha(b.clientSecret)||order.book_id!==bookId||order.customer_email!==email||order.customer_phone!==phone||!!order.verification_test!==verification)throw error;
       }
     }
     const existing=await one('ebook_payments',eq('order_id',order.id));
@@ -85,7 +89,7 @@ async function handle(event){
       body:{payment_type:'mobile',details:{amount:order.amount_tzs,currency:'TZS'},
         phone_number:order.customer_phone,customer:{firstname:words[0],lastname:words.slice(1).join(' ')||words[0],email:order.customer_email},
         webhook_url:configuredUrl.origin+'/api?action=webhook',
-        metadata:{order_id:order.id}}});
+        metadata:{order_id:order.id,...(verification?{verification_test:true}:{})}}});
     if(!result?.reference)throw new HttpError(502,'Payment reference haijarudi.');
     try{await insert('ebook_payments',{order_id:order.id,provider_reference:result.reference,
       amount_tzs:order.amount_tzs,currency:'TZS',status:'pending'});}

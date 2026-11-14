@@ -1,70 +1,43 @@
-# Snippe Mobile Money — Muunganisho wa eBook
+# Snippe — AKILI STORE
 
-Mfumo unatumia Snippe API version `2026-01-25` kupitia HTTPS. Checkout inatengeneza **order** yenye bei halisi kutoka database, Snippe inatuma USSD prompt, webhook inahakikiwa kwa HMAC-SHA256, na server inakagua tena `GET /v1/payments/{reference}`. PDFs hufunguliwa baada ya order kuwa `paid` pekee.
+The existing production `SNIPPE_API_KEY`, `SNIPPE_WEBHOOK_SECRET` and `SITE_URL` are present. Admin → Mauzo na malipo → **Thibitisha muunganisho** successfully verified the live Snippe account on 14 November 2026. This read-only balance request does not create a payment or prove webhook delivery. Public checkout remains disabled pending the controlled purchase below.
 
-## 1. Taarifa za Snippe
+## Production configuration
 
-Ingia kwenye dashboard yako ya **Snippe**. Chagua:
+Vercel project: `mifumoyabiashara`, team `swaburs-projects`.
 
-- **Settings → API Keys → Create API Key**. Ruhusa: `collection:create` na `collection:read` pekee. Nakili key mara moja, lakini **usiitumie kwenye chat, code ya GitHub au screenshot**.
-- **Settings → Webhook Secret**. Nakili signing key kwa faragha. Usiiweke kwenye public frontend.
-
-Maelekezo rasmi:
-- https://docs.snippe.sh/docs/2026-01-25/authentication
-- https://docs.snippe.sh/docs/2026-01-25/payments/mobile-money
-- https://docs.snippe.sh/docs/2026-01-25/webhooks
-
-## 2. Vercel — Configuration
-
-Fungua project **mifumoyabiashara** kwenye Vercel → **Settings → Environment Variables**, kisha weka:
-
-| Variable | Value |
+| Server variable | Purpose |
 |---|---|
-| `SNIPPE_API_KEY` | API Key ya Snippe yenye `collection:create` na `collection:read` |
-| `SNIPPE_WEBHOOK_SECRET` | Signing key kutoka Snippe → Webhook Secret |
-| `SITE_URL` | URL halisi ya HTTPS kwa environment husika bila slash ya mwisho |
-| `SNIPPE_PAYMENTS_ENABLED` | `false` hadi uthibitishaji wa mwisho ufanikiwe; badilisha `true` kuanza mauzo baada ya majaribio |
+| `SNIPPE_API_KEY` | Existing Snippe key with `collection:read` and `collection:create` |
+| `SNIPPE_WEBHOOK_SECRET` | Matching account signing secret |
+| `SITE_URL` | `https://www.akilistore.com` |
+| `SNIPPE_PAYMENTS_ENABLED` | Keep `false` until the controlled purchase is verified; set `true` and redeploy to open public sales |
 
-Kwa branch `preview/ebook-functional`, mfano wa `SITE_URL` ni:
+Credentials remain Secret values in Vercel, never in browser code, logs, Git or chat. Environment changes require redeployment. Existing credentials must not be regenerated merely for verification.
 
-```text
-https://mifumoyabiashara-git-preview-ebook-functional-swaburs-projects.vercel.app
-```
+## Controlled launch purchase
 
-Kwa **Production**, tumia domain inayosomeka kwenye Vercel → Project → Domains (si preview alias). Set `SITE_URL` tofauti kwa Preview na Production inapofaa. **Webhook URL lazima iwe public**: ikiwa Preview inalindwa na Vercel Authentication, Snippe haitafikia callback. Tumia public Production URL wakati wa kupima miamala halisi.
+1. Sign in as an existing admin and open **Mauzo na malipo → Jaribu malipo · TSh 500**. This opens the published book checkout with `?verify=1`.
+2. The admin reviews an explicit **real TSh 500 payment**, enters their own mobile number and selects **Lipa TSh 500**. The agent must not initiate it without payer authorization. PIN entry stays on the payer's phone.
+3. This is the ordinary checkout/payment/fulfillment flow. The server fixes the amount at 500 only for a confirmed database admin while public payments are disabled. Reader-supplied flags, editable metadata and client-supplied prices cannot claim this amount. The book's listed price remains TSh 25,000.
+4. The real order is labelled `verification_test=true` and displayed as **Jaribio la mfumo** in order history. This label never invents a successful state or bypasses payment verification. Only an independently verified Snippe payment can create the paid order, entitlement and ledger allocations.
+5. Confirm the provider reference, amount/currency, authentic webhook event, paid order, single entitlement, 60/30/10 ledger allocation and authenticated PDF reading/download. A polling event alone does not prove the webhook secret matches. Database-only checks run inside rolled-back transactions and leave no fake sales.
+6. Open public sales only after these checks. Setting `SNIPPE_PAYMENTS_ENABLED=true` closes the discounted launch path; ordinary checkout always uses the book's database price.
 
-Taarifa hizi lazima ziwe **server-side environment variables**. `SNIPPE_API_KEY` na `SNIPPE_WEBHOOK_SECRET` zisionekane kwenye `public/`, HTML, JavaScript ya browser, au repo. Kubadili Vercel environment variables kunahitaji redeploy ili functions zitumie values mpya.
+## Callback and reconciliation
 
-Muunganisho wa Supabase uliopo unahitaji pia `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` na `SUPABASE_PUBLISHABLE_KEY`. Usichanganye Supabase `service_role` key na public publishable key.
+Every payment includes this public HTTPS callback:
 
-## 3. Webhook
+`https://www.akilistore.com/api?action=webhook`
 
-Backend inatuma URL ifuatayo kwenye Snippe kila inapounda payment:
+The server verifies HMAC-SHA256 over the exact `timestamp.raw_body`, rejects stale timestamps, then independently reads `GET /v1/payments/{reference}`. Reference, order, amount, currency and provider status must match before the database atomically records payment, library entitlement, ledger allocation and notification. The Vercel adapter preserves the raw body.
 
-```text
-<SITE_URL>/api?action=webhook
-```
+The server uses a stable idempotency key below Snippe's 30-character limit. A retry of the same checkout returns the same order/payment. Failed or pending payments never unlock content; a late failed event cannot downgrade a paid order. Checkout status polling can reconcile delayed webhooks with the same provider verification.
 
-Hii ni `POST` endpoint ya backend, si ukurasa wa kuingia kwa browser. Snippe inatuma event ya `payment.completed` au `payment.failed`. Server inakataa signature isiyolingana, timestamp ya zamani, reference isiyojulikana, amount/currency zisizolingana na duplicates. Inathibitisha status tena moja kwa moja kutoka Snippe.
+Purchased books are available in the authenticated library. Optional purchase emails use a verified Resend sender (`RESEND_API_KEY`, `EMAIL_FROM`); SMS receipts require a separately verified eHub connection and explicit activation.
 
-Kama webhook imechelewa, ukurasa wa mteja pia unaomba status kwa server. Server inaweza kuhakiki Snippe, lakini haionyeshi `paid` bila uthibitisho wa provider.
+## Validation
 
-## 4. Kuhakikisha connection
+`npm run check` and `npm test` cover private checkout access, price tampering, admin-only verification, idempotency, signatures, stale/tampered callbacks, amount mismatch and protected content. Live connection and final delivery require separate evidence.
 
-1. Redeploy branch iliyowekewa environment variables.
-2. Ingia kwenye `/admin.html`.
-3. Nenda **Mipangilio → Kagua Muunganisho wa Snippe**. Hiki kinafanya ombi la kusoma balance ya akaunti (**hakianzishi malipo**) na kurudisha matokeo bila kuonyesha salio wala API key.
-4. Hakikisha kitabu kina PDF na bei yake ni **TSh 25,000**.
-5. Kwa jaribio la mwisho la end-to-end, anza kwa kuhakikisha Snippe connection ipo na webhook inafikika kutoka mtandao bila Vercel login. Kwenye mazingira ya majaribio yanayodhibitiwa pekee, weka `SNIPPE_PAYMENTS_ENABLED=true` kwa muda na redeploy; fanya muamala halisi kwa ridhaa ya mlipaji. Hakikisha webhook, amount, order kuwa `paid`, reader na download zimefaulu.
-6. Zima flag tena (`false`) ukimaliza jaribio. Iwashe rasmi kwenye Production tu baada ya kuthibitisha matokeo yote. Kuongeza credentials pekee hakutawasha checkout.
-
-Kwa kutuma PDF access kwa email baada ya malipo, ongeza pia `RESEND_API_KEY` na `EMAIL_FROM` inayotoka kwenye verified sender domain; vinginevyo mnunuzi anapata access katika browser ya checkout lakini email link haiwezi kutumwa.
-
-## 5. Usalama
-
-- Usishiriki API key au webhook secret kwenye mazungumzo; ziweke **Vercel Environment Variables** pekee.
-- Snippe idempotency key ina urefu usiozidi characters 30 na huzuia duplicate intents kwenye retries.
-- Server inahakiki amount, currency, reference na status. Event ya webhook pekee haipewi mamlaka ya kufungua PDF.
-- `ebook_payments.last_checked_at` inapunguza verification requests zinazorudiwa.
-- `SNIPPE_PAYMENTS_ENABLED=false` inazuia kuanzisha malipo mapya hata kama Snippe credentials zipo. Webhook na reconciliation huendelea kuthibitisha malipo yaliyowahi kuanzishwa ili yasipotee.
-- Hakuna `paid` state ya kubuni, hakuna transaction ya test kwenye live database.
+Primary documentation: https://docs.snippe.sh/docs/2026-01-25/authentication, https://docs.snippe.sh/docs/2026-01-25/payments/mobile-money, https://docs.snippe.sh/docs/2026-01-25/webhooks.

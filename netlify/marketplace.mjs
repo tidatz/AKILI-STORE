@@ -113,7 +113,7 @@ export async function marketplace(event,action){
    for(const a of access){if(!paid.has(a.book_id))continue;const book=await one('ebook_books',eq('id',a.book_id));if(book)books.push({...publicBook(book),purchased_at:a.created_at,progress:progress.find(p=>p.book_id===book.id)||null});}
    return {books};
  }
- if(action==='market-orders'&&method==='GET')return {orders:await rows('ebook_orders','select=id,book_id,amount_tzs,currency,status,created_at,paid_at&'+eq('user_id',u.id)+'&order=created_at.desc&limit=200')};
+ if(action==='market-orders'&&method==='GET')return {orders:await rows('ebook_orders','select=id,book_id,amount_tzs,currency,status,created_at,paid_at,verification_test&'+eq('user_id',u.id)+'&order=created_at.desc&limit=200')};
  if(action==='market-access'&&method==='POST'){
    const a=await entitled(u,b.bookId),book=await one('ebook_books',eq('id',a.book_id));
    if(!book?.pdf_path)throw new HttpError(404,'PDF haipatikani. Tafadhali wasiliana na msaada.');
@@ -201,7 +201,7 @@ export async function marketplace(event,action){
  if(action==='market-admin-data'&&method==='GET'){
    const [books,profiles,orders,withdrawals,tickets,reviews,audits,settings,ledger,invitations]=await Promise.all([
      rows('ebook_books','select=*&order=created_at.desc'),rows('akili_profiles','select=*&order=created_at.desc&limit=300'),
-     rows('ebook_orders','select=id,book_id,customer_name,customer_email,customer_phone,amount_tzs,status,created_at,paid_at&order=created_at.desc&limit=300'),
+     rows('ebook_orders','select=id,book_id,customer_name,customer_email,customer_phone,amount_tzs,status,created_at,paid_at,verification_test&order=created_at.desc&limit=300'),
      rows('akili_withdrawals','select=*&order=created_at.desc&limit=200'),rows('akili_support_tickets','select=*&order=created_at.desc&limit=200'),
      rows('akili_reviews','select=*&order=created_at.desc&limit=200'),rows('akili_audit_logs','select=*&order=created_at.desc&limit=100'),
      one('ebook_site_settings','id=eq.1'),rows('akili_ledger','select=*&order=created_at.desc&limit=1000'),rows('akili_author_invitations','select=id,email,expires_at,accepted_at,email_sent_at,created_at&order=created_at.desc&limit=100')]);

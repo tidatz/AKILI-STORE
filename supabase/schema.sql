@@ -54,6 +54,8 @@ create table if not exists public.ebook_orders (
 );
 create index if not exists ebook_orders_recent on public.ebook_orders(created_at desc);
 create index if not exists ebook_orders_email on public.ebook_orders(customer_email);
+-- Real owner-approved launch checks are separately labelled; ordinary prices stay server-derived.
+alter table public.ebook_orders add column if not exists verification_test boolean not null default false;
 
 create table if not exists public.ebook_payments (
   id uuid primary key default gen_random_uuid(),
