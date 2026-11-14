@@ -79,6 +79,9 @@ function verificationCheckout(bookId){
  if(pending?.orderId&&pending.bookId===bookId&&(!pending.userId||pending.userId===me.id))return pending.verification===true;
  return !catalog.payments_enabled&&new URLSearchParams(location.search).get('verify')==='1';
 }
+function verificationAccountView(){
+ return publicPage(`<section class="container section"><div class="auth-card" style="margin:0 auto"><p class="eyebrow">JARIBIO · TSh 500</p><h1>Tumia akaunti ya admin.</h1><p>Umeingia kwa <strong>${h(me.email)}</strong>. Jaribio hili linapatikana kwa akaunti yenye ruhusa ya admin.</p>${btn('switch-account','Ingia kwa akaunti ya admin',location.pathname+location.search,'btn primary block')}<p class="auth-foot">${link('/reader-dashboard','Rudi kwenye akaunti yangu','text-link')}</p></div></section>`);
+}
 function paymentActions(d){
  const b=d.books.find(b=>b.status==='published');
  return `<div class="button-row">${btn('verify-snippe','Thibitisha muunganisho','','btn secondary','shield')}${b&&!d.integration.payments_enabled&&!d.orders.some(o=>o.verification_test&&o.status==='paid')?link('/checkout/'+b.id+'?verify=1','Jaribu malipo · TSh 500','btn'):''}</div>`;
@@ -94,7 +97,7 @@ async function render(){
  document.title='AKILI STORE';
  try{
   if(path==='/auth/callback'){
-   const result=await callback();me=null;if(result.recovery){$('#app').innerHTML=authView('reset');return;}if(!session()){toast('Email imethibitishwa. Ingia kwenye akaunti yako.');return navigate('/login',true);}await getMe();return navigate(me.role==='admin'?'/admin':result.next,true);
+   const result=await callback();me=null;if(result.recovery){$('#app').innerHTML=authView('reset');return;}if(!session()){toast('Email imethibitishwa. Ingia kwenye akaunti yako.');return navigate('/login',true);}await getMe();return navigate(result.next||(me.role==='admin'?'/admin':'/reader-dashboard'),true);
   }
   await getCatalog();if(session())await getMe();
   if(sequence!==routeSequence)return;
@@ -107,7 +110,7 @@ async function render(){
   if(path==='/')content=home(catalog);
   else if(['/books','/search','/categories'].includes(path))content=catalogView(catalog);
   else if(path.startsWith('/book/')){const slug=decodeURIComponent(path.slice(6)),book=catalog.books.find(b=>b.slug===slug);if(!book)throw Error('Kitabu hiki hakipatikani kwa sasa.');const r=await api('book-reviews',{bookId:book.id}).catch(()=>({reviews:[]}));content=detail(book,catalog,r.reviews);document.title='AKILI STORE';}
-  else if(['/login','/register','/forgot-password'].includes(path)){if(me&&path!=='/forgot-password')return navigate(new URLSearchParams(location.search).get('next')|| (me.role==='admin'?'/admin':'/reader-dashboard'),true);content=authView(path==='/register'?'register':path==='/forgot-password'?'forgot':'login');}
+  else if(['/login','/register','/forgot-password'].includes(path)){if(me&&path!=='/forgot-password')return navigate(safeNext(new URLSearchParams(location.search).get('next')|| (me.role==='admin'?'/admin':'/reader-dashboard')),true);content=authView(path==='/register'?'register':path==='/forgot-password'?'forgot':'login');}
   else if(path==='/reader-dashboard'){const [lib,orders]=await Promise.all([getLibrary(),api('market-orders')]);content=readerHome(lib,orders.orders);}
   else if(path==='/my-library'){const lib=await getLibrary();content=dashboard(heading('Maktaba yangu','Vitabu vyako, tayari kusoma popote.',link('/books','Tafuta vitabu','btn secondary small','search'))+(lib.books.length?libraryCards(lib.books):empty('Maktaba yako bado iko tupu','Chagua kitabu, lipia na kitaonekana hapa pamoja na maendeleo yako ya kusoma.',link('/books','Chagua kitabu','btn','arrow'),'library')),'Maktaba yangu');}
   else if(path==='/order-history'){const d=await api('market-orders');content=dashboard(heading('Manunuzi yangu','Historia ya oda na hali ya malipo.')+`<section class="panel">${ordersTable(d.orders)}</section>`,'Manunuzi yangu');}
@@ -115,7 +118,7 @@ async function render(){
   else if(path==='/profile-settings')content=profileView();
   else if(path==='/help'){const d=me?await api('market-support'):{tickets:[]};content=supportView(d.tickets);}
   else if(path==='/platform-policies')content=policies();
-  else if(path.startsWith('/checkout/')){const book=catalog.books.find(b=>b.id===path.split('/')[2]);if(!book)throw Error('Kitabu hakijapatikana.');const lib=await getLibrary();if(lib.books.some(b=>b.id===book.id))return navigate('/my-library',true);content=checkoutView(book);}
+  else if(path.startsWith('/checkout/')){const book=catalog.books.find(b=>b.id===path.split('/')[2]);if(!book)throw Error('Kitabu hakijapatikana.');if(new URLSearchParams(location.search).get('verify')==='1'&&me.role!=='admin')content=verificationAccountView();else{const lib=await getLibrary();if(lib.books.some(b=>b.id===book.id))return navigate('/my-library',true);content=checkoutView(book);}}
   else if(path==='/invite'){const token=new URLSearchParams(location.search).get('token')||'';content=dashboard(heading('Mwaliko wa mwandishi','Karibu kuchapisha maarifa yako kwenye AKILI STORE.')+`<section class="panel"><h2>Kubali mwaliko</h2><p class="muted small">Akaunti yako: ${h(me.email)}. Mwaliko utakubaliwa ikiwa email hii ndiyo iliyoalikwa na muda haujaisha.</p>${btn('accept-invite','Kubali na fungua eneo la mwandishi',token,'btn primary','check')}</section>`,'Mwaliko');}
   else if(isAdmin){const d=await getAdmin();if(path==='/admin')content=adminHome(d);else if(path==='/admin/books')content=booksManage(d,true);else if(path.startsWith('/admin/books/')){const id=path.split('/')[3],b=id==='new'?{}:d.books.find(b=>b.id===id);if(!b)throw Error('Kitabu hakijapatikana.');content=editor(b,true);}else if(['/admin/users','/admin/authors'].includes(path))content=usersView(d);else if(['/admin/orders','/admin/payments'].includes(path))content=dashboard(heading('Mauzo na malipo','Manunuzi na uthibitisho wa malipo.',paymentActions(d))+`<section class="panel">${ordersTable(d.orders,true)}</section>`,'Mauzo na malipo','admin');else if(['/admin/withdrawals','/admin/reports'].includes(path))content=financeView(d,true);else if(path==='/admin/support')content=supportView(d.tickets,true);else if(path==='/admin/settings')content=settingsView(d);else if(path==='/admin/messages')content=smsView(await api('market-admin-sms-data'));else if(path==='/admin/reviews')content=booksManage(d,true);}
   else if(isAuthor){const d=await getAuthor();if(path==='/author-dashboard')content=authorHome(d);else if(path==='/author/books')content=booksManage(d);else if(path.startsWith('/author/books/')){const id=path.split('/')[3],b=id==='new'?{}:d.books.find(b=>b.id===id);if(!b)throw Error('Kitabu hakijapatikana.');content=editor(b);}else if(path==='/withdrawal-request')content=financeView(d);else if(path==='/sales-analytics')content=dashboard(heading('Mauzo yangu','Mapato yanatokana na malipo yaliyothibitishwa.')+`<div class="stat-grid">${stat('Vitabu vilivyouzwa',d.ledger.length,'receipt')}${stat('Mapato yangu',money(d.balance.earned),'wallet')}${stat('Salio linalopatikana',money(d.balance.available),'chart')}</div><section class="panel">${table(['Tarehe','Oda','Mapato yako'],d.ledger.map(l=>row([date(l.created_at),h(l.order_id.slice(0,12)),money(l.amount_tzs)])).join(''),'Bado hakuna mauzo.')}</section>`,'Mauzo yangu','author');}
@@ -145,7 +148,8 @@ document.addEventListener('click',async e=>{
   if(a==='category'){filterCategory=id;document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',c.dataset.id===id));updateCatalog();return;}
   if(a==='clear-filters'){filterSearch='';filterCategory='';$('#catalog-search').value='';document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',c.dataset.id===''));updateCatalog();return;}
   if(a==='logout'){await signout();me=null;invalidate();return navigate('/login');}
-  if(a==='google')return googleLogin(new URLSearchParams(location.search).get('next')||'/reader-dashboard');
+  if(a==='switch-account'){const next=safeNext(id);await signout();me=null;invalidate();return navigate('/login?next='+encodeURIComponent(next),true);}
+  if(a==='google')return googleLogin(new URLSearchParams(location.search).get('next')||'');
   if(a==='retry'){catalog=null;return render();}
   if(a==='preview'){el.disabled=true;const data=await api('preview',{bookId:id});modal('Sampuli ya kitabu',`<p class="muted small">${h(data.title)}</p><p class="small">Sampuli hii ni sehemu ya kitabu. PDF kamili inafunguliwa baada ya ununuzi.</p><a class="btn block" href="${h(data.url)}" target="_blank" rel="noopener noreferrer">${icon('book',17)} Fungua sampuli ya PDF</a>`);return;}
   if(a==='inspect-pdf'||a==='inspect-preview'){el.disabled=true;const data=await api('market-inspect-file',{bookId:id,kind:a==='inspect-pdf'?'pdf':'preview'});modal('Kagua faili',`<p class="muted small">Kiungo cha muda cha ukaguzi wa faili.</p><a href="${h(data.url)}" target="_blank" rel="noopener noreferrer" class="btn block">Fungua PDF ${icon('arrow',17)}</a>`);return;}

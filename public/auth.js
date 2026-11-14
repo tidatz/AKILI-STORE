@@ -30,15 +30,15 @@ export async function register(email,password,name){
  const result=await auth('signup?redirect_to='+encodeURIComponent(location.origin+'/auth/callback'),{email,password,data:{full_name:name}});
  if(result.access_token)saveSession(result);return !!result.access_token;
 }
-export async function signout(){const s=session();sessionStorage.removeItem(storageKey);if(s?.access_token)await auth('logout',{},s.access_token).catch(()=>{});}
+export async function signout(){const s=session();sessionStorage.removeItem(storageKey);if(s?.access_token)await auth('logout?scope=local',{},s.access_token).catch(()=>{});}
 export async function authSettings(){try{return await auth('settings');}catch{return {};}}
-export async function googleLogin(next='/my-library'){
+export async function googleLogin(next=''){
  const c=await config();const bytes=crypto.getRandomValues(new Uint8Array(32));
  const verifier=Array.from(bytes,v=>v.toString(16).padStart(2,'0')).join('');
  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));
  const challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
- sessionStorage.setItem('akili-pkce',verifier);sessionStorage.setItem('akili-next',safeNext(next));
- const params=new URLSearchParams({provider:'google',redirect_to:location.origin+'/auth/callback',code_challenge:challenge,code_challenge_method:'s256'});
+ sessionStorage.setItem('akili-pkce',verifier);if(next)sessionStorage.setItem('akili-next',safeNext(next));else sessionStorage.removeItem('akili-next');
+ const params=new URLSearchParams({provider:'google',redirect_to:location.origin+'/auth/callback',code_challenge:challenge,code_challenge_method:'s256',prompt:'select_account'});
  location.assign(c.supabase_url+'/auth/v1/authorize?'+params);
 }
 export function safeNext(value){return typeof value==='string'&&value.startsWith('/')&&!value.startsWith('//')&&!/[\\\x00-\x20]/.test(value)?value:'/my-library';}
@@ -51,7 +51,8 @@ export async function callback(){
    saveSession(await auth('token?grant_type=pkce',{auth_code:query.get('code'),code_verifier:verifier}));sessionStorage.removeItem('akili-pkce');
  }else if(hash.has('access_token'))saveSession({access_token:hash.get('access_token'),refresh_token:hash.get('refresh_token'),expires_in:Number(hash.get('expires_in'))||3600});
  const recovery=hash.get('type')==='recovery';history.replaceState({},'',location.pathname);
- return {recovery,next:safeNext(sessionStorage.getItem('akili-next'))};
+ const next=sessionStorage.getItem('akili-next');sessionStorage.removeItem('akili-next');
+ return {recovery,next:next?safeNext(next):null};
 }
 export async function recover(email){return auth('recover?redirect_to='+encodeURIComponent(location.origin+'/auth/callback'),{email});}
 export async function changePassword(password){
