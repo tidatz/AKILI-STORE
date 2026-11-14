@@ -3,4 +3,5 @@
 !.env.example
 .netlify/
 node_modules/
+public/vendor/pdfjs/
 .DS_Store

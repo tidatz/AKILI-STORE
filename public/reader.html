@@ -13,6 +13,7 @@
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg>
       </button></div>
   </header>
-  <div class="pdf-stage" id="pdf-stage"><div><p id="reader-message" class="reader-message" role="status">Inafungua kitabu...</p><button id="retry-reader" class="secondary-button" type="button" hidden>Jaribu kufungua tena</button></div><canvas id="page-canvas" hidden></canvas></div>
+  <div class="reader-actions"><button id="open-pdf" class="secondary-button" type="button" disabled>Fungua PDF</button><span>Unaweza kusoma hapa au kupakua kwa kitufe cha juu.</span></div>
+  <div class="pdf-stage" id="pdf-stage"><div><p id="reader-message" class="reader-message" role="status">Inafungua kitabu...</p><button id="retry-reader" class="secondary-button" type="button" hidden>Jaribu kufungua tena</button><a id="reader-login" class="secondary-button" hidden>Ingia kwenye akaunti</a></div><canvas id="page-canvas" hidden></canvas></div>
   <script type="module" src="/reader.js"></script>
 </body></html>

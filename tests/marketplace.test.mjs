@@ -40,3 +40,26 @@ test('a verified reader cannot claim another email invitation or an expired invi
   assert.equal((await request('market-accept-email-invite',{id:other})).status,403);assert.equal(calls.some(c=>c.path.includes('/rpc/')),false);
  },{'/rest/v1/akili_author_invitations':()=>[{id:other,token_hash:'test-hash',accepted_at:null,...invite}]});
 });
+test('a paid reader gets their own purchase confirmation without private PDF paths',async()=>mock('reader',async calls=>{
+ const r=await request('market-purchase',{orderId:other});assert.equal(r.status,200);const data=await r.json();
+ assert.equal(data.order.status,'paid');assert.equal(data.book.id,bookId);assert.equal(data.book.pdf_path,undefined);
+ const query=calls.find(c=>c.path==='/rest/v1/ebook_orders').query;assert.ok(query.includes('user_id=eq.'+uid));
+ assert.equal(calls.some(c=>c.path.startsWith('/storage/')),false);
+},{'/rest/v1/ebook_orders':()=>[{id:other,book_id:bookId,user_id:uid,status:'paid',amount_tzs:25000}],'/rest/v1/akili_entitlements':()=>[{book_id:bookId,user_id:uid,order_id:other}]}));
+test('purchase confirmation cannot expose another buyer or an unpaid or revoked PDF',async()=>{
+ await mock('reader',async()=>assert.equal((await request('market-purchase',{orderId:other})).status,404),{'/rest/v1/ebook_orders':()=>[{id:other,book_id:bookId,user_id:other,status:'paid'}]});
+ await mock('reader',async calls=>{
+  const r=await request('market-purchase',{orderId:other});assert.equal(r.status,200);assert.equal((await r.json()).order.status,'pending');
+  assert.equal(calls.some(c=>c.path.startsWith('/storage/')),false);
+ },{'/rest/v1/ebook_orders':()=>[{id:other,book_id:bookId,user_id:uid,status:'pending'}]});
+ await mock('reader',async()=>assert.equal((await request('market-purchase',{orderId:other})).status,403),{'/rest/v1/ebook_orders':()=>[{id:other,book_id:bookId,user_id:uid,status:'paid'}]});
+ assert.equal((await request('market-purchase',{orderId:other},null)).status,401);
+});
+test('a paid buyer library contains the purchased book and authorizes a fresh read and download',async()=>mock('reader',async calls=>{
+ const lib=await (await request('market-library')).json();assert.equal(lib.books[0].id,bookId);
+ for(const purpose of ['read','download']){
+  const r=await request('market-access',{bookId,purpose});assert.equal(r.status,200);const data=await r.json();
+  assert.ok(data.url.startsWith('https://database.test/storage/v1/object/sign/ebook-pdfs/'));assert.equal(data.filename,'existing-book.pdf');
+ }
+ assert.equal(calls.filter(c=>c.path.startsWith('/storage/v1/object/sign/')).length,2);
+},{'/rest/v1/ebook_orders':()=>[{id:other,book_id:bookId,user_id:uid,status:'paid'}],'/rest/v1/akili_entitlements':()=>[{book_id:bookId,user_id:uid,order_id:other}],'/storage/v1/object/sign/ebook-pdfs/private/full.pdf':()=>({signedURL:'/object/sign/ebook-pdfs/private/full.pdf?token=unit-test-only'})}));

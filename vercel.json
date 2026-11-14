@@ -4,6 +4,10 @@
   "outputDirectory": "public",
   "rewrites": [
     {
+      "source": "/purchase/:orderId",
+      "destination": "/index.html"
+    },
+    {
       "source": "/book/:slug",
       "destination": "/index.html"
     },
@@ -149,5 +153,6 @@
         }
       ]
     }
-  ]
+  ],
+  "buildCommand": "npm run build"
 }

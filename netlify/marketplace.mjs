@@ -114,6 +114,14 @@ export async function marketplace(event,action){
    return {books};
  }
  if(action==='market-orders'&&method==='GET')return {orders:await rows('ebook_orders','select=id,book_id,amount_tzs,currency,status,created_at,paid_at,verification_test&'+eq('user_id',u.id)+'&order=created_at.desc&limit=200')};
+ if(action==='market-purchase'&&method==='POST'){
+   const order=await one('ebook_orders',eq('id',uuid(b.orderId))+'&'+eq('user_id',u.id),'id,book_id,amount_tzs,currency,status,paid_at,user_id');
+   if(!order||order.user_id!==u.id)throw new HttpError(404,'Oda haijapatikana kwenye akaunti hii.');
+   const book=await one('ebook_books',eq('id',order.book_id));
+   if(!book)throw new HttpError(404,'Kitabu hakijapatikana. Wasiliana na msaada.');
+   if(order.status==='paid')await entitled(u,order.book_id);
+   return {order:{id:order.id,book_id:order.book_id,amount_tzs:order.amount_tzs,status:order.status,paid_at:order.paid_at},book:publicBook(book)};
+ }
  if(action==='market-access'&&method==='POST'){
    const a=await entitled(u,b.bookId),book=await one('ebook_books',eq('id',a.book_id));
    if(!book?.pdf_path)throw new HttpError(404,'PDF haipatikani. Tafadhali wasiliana na msaada.');

@@ -9,14 +9,16 @@ export async function config(){
 }
 async function auth(path,body,token){
  const c=await config();if(!c.supabase_url||!c.publishable_key)throw Error('Huduma ya akaunti haipatikani kwa sasa.');
- const r=await fetch(c.supabase_url+'/auth/v1/'+path,{method:body?'POST':'GET',headers:{apikey:c.publishable_key,...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+ const r=await fetch(c.supabase_url+'/auth/v1/'+path,{signal:AbortSignal.timeout(15000),method:body?'POST':'GET',headers:{apikey:c.publishable_key,...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
  const j=await r.json().catch(()=>({}));if(!r.ok){const e=Error(j.error_description||j.msg||j.message||'Imeshindikana. Jaribu tena.');e.status=r.status;throw e;}return j;
 }
 export async function api(action,body,retry=true){
  let s=session();
  if(s?.refresh_token&&s.expires_at<Date.now()+60000)await refresh();
  s=session();
- const r=await fetch('/api?action='+encodeURIComponent(action),{method:body?'POST':'GET',headers:{...(s?.access_token?{Authorization:'Bearer '+s.access_token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+ let r;
+ try{r=await fetch('/api?action='+encodeURIComponent(action),{signal:AbortSignal.timeout(30000),method:body?'POST':'GET',headers:{...(s?.access_token?{Authorization:'Bearer '+s.access_token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});}
+ catch{const e=Error('Muunganisho umekatika. Taarifa zako zimehifadhiwa; jaribu tena.');e.status=503;throw e;}
  if(r.status===401&&retry&&s?.refresh_token){await refresh();return api(action,body,false);}
  const j=await r.json().catch(()=>({error:'Huduma haipatikani. Tafadhali jaribu tena.'}));
  if(!r.ok){const e=Error(j.error||'Imeshindikana. Jaribu tena.');e.status=r.status;throw e;}return j;

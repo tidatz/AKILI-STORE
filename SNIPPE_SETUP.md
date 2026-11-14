@@ -1,6 +1,6 @@
 # Snippe — AKILI STORE
 
-The existing production `SNIPPE_API_KEY`, `SNIPPE_WEBHOOK_SECRET` and `SITE_URL` are present. Admin → Mauzo na malipo → **Thibitisha muunganisho** successfully verified the live Snippe account on 14 November 2026. This read-only balance request does not create a payment or prove webhook delivery. Public checkout remains disabled pending the controlled purchase below.
+The existing production `SNIPPE_API_KEY`, `SNIPPE_WEBHOOK_SECRET` and `SITE_URL` are present. Admin → Mauzo na malipo → **Thibitisha muunganisho** successfully verified the live Snippe account on 14 November 2026. The subsequent real TSh 500 launch purchase was independently verified on 14 November 2026: a signed webhook, completed payment, paid order, active entitlement and balanced 60/30/10 allocation were recorded. Public checkout is activated through the production flag after deployment.
 
 ## Production configuration
 
@@ -35,7 +35,9 @@ The server verifies HMAC-SHA256 over the exact `timestamp.raw_body`, rejects sta
 
 The server uses a stable idempotency key below Snippe's 30-character limit. A retry of the same checkout returns the same order/payment. Failed or pending payments never unlock content; a late failed event cannot downgrade a paid order. Checkout status polling can reconcile delayed webhooks with the same provider verification.
 
-Purchased books are available in the authenticated library. Optional purchase emails use a verified Resend sender (`RESEND_API_KEY`, `EMAIL_FROM`); SMS receipts require a separately verified eHub connection and explicit activation.
+After confirmation, checkout opens `/purchase/:orderId` with explicit **Soma kitabu** and **Pakua PDF** actions. The confirmation API checks the verified buyer and an active paid entitlement; an order ID alone grants no access. Returning to the browser or reconnecting checks payment status without creating another charge. Purchased books are available in the authenticated library for every role, including admin.
+
+The pinned PDF reader is copied to `/vendor/pdfjs/` by `npm run build` and served from the store domain. Reading does not depend on a third-party JavaScript CDN. A fresh authorized PDF download and **Fungua PDF** remain available if canvas rendering fails. Optional purchase emails use a verified Resend sender (`RESEND_API_KEY`, `EMAIL_FROM`); SMS receipts require a separately verified eHub connection and explicit activation.
 
 ## Validation
 

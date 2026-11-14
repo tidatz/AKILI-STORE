@@ -18,7 +18,8 @@ function updateButtons(){
   $('#next').disabled=!ready||page>=pdf.numPages;
   $('#zoom-in').disabled=!ready||zoom>=2.5;
   $('#zoom-out').disabled=!ready||zoom<=.5;
-  $('#download').disabled=!ready;
+  $('#download').disabled=!details;
+  $('#open-pdf').disabled=!details;
   $('#pages').textContent=ready?page+' / '+pdf.numPages:'— / —';
   $('#zoom-label').textContent=Math.round(zoom*100)+'%';
 }
@@ -52,7 +53,7 @@ $('#download').onclick=async()=>{
   $('#download').disabled=true;
   try{
     const data=await request('download');
-    const result=await fetch(data.url);
+    const result=await fetch(data.url,{signal:AbortSignal.timeout(30000)});
     if(!result.ok)throw Error('PDF haikupakuliwa.');
     const blob=await result.blob();
     const url=URL.createObjectURL(blob);
@@ -61,6 +62,12 @@ $('#download').onclick=async()=>{
   }catch(e){message(e.message)}
   finally{updateButtons()}
 };
+$('#open-pdf').onclick=async()=>{
+  $('#open-pdf').disabled=true;
+  try{const data=await request('read');location.assign(data.url);}
+  catch(e){message(e.message||'PDF haijafunguka. Jaribu tena.');}
+  finally{updateButtons();}
+};
 let resize;window.addEventListener('resize',()=>{clearTimeout(resize);resize=setTimeout(render,200)});
 async function openBook(){
   $('#retry-reader').hidden=true;
@@ -68,12 +75,17 @@ async function openBook(){
   try{
     details=await request('read');
     $('#reader-title').textContent=details.title;document.title='AKILI STORE';
-    const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs');
-    pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+    updateButtons();
+    const pdfjs=await import('/vendor/pdfjs/pdf.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc='/vendor/pdfjs/pdf.worker.min.mjs';
     pdf=await pdfjs.getDocument({url:details.url}).promise;
     if(bookId)page=Math.min(pdf.numPages,Math.max(1,details.page||1));
     updateButtons();await render();
-  }catch(e){message(e.message||'Imeshindikana kufungua PDF.');$('#retry-reader').hidden=false;}
+  }catch(e){
+    if(e.status===401){message('Ingia kwa akaunti uliyotumia kununua kitabu.');const login=$('#reader-login');login.href='/login?next='+encodeURIComponent(location.pathname+location.search);login.hidden=false;}
+    else message(details?'Msomaji hajafunguka. Tumia “Fungua PDF” au kitufe cha kupakua.':e.message||'Imeshindikana kufungua PDF.');
+    $('#retry-reader').hidden=false;updateButtons();
+  }
 }
 $('#retry-reader').onclick=openBook;
 openBook();
