@@ -79,7 +79,6 @@ async function openBook(){
   try{
     details=await request('read');
     $('#reader-title').textContent=details.title;document.title=details.title+' | AKILI STORE';
-    if(details.appearance?.design)window.akiliAppearance?.setPersonal(details.appearance);
     if(!bookId){let progress;try{progress=JSON.parse(localStorage.getItem('akili-guest-progress-'+details.slug)||'null');}catch{}page=progress?.page||1;}
     updateButtons();
     const pdfjs=await import('/vendor/pdfjs/pdf.mjs');
@@ -94,5 +93,4 @@ async function openBook(){
   }
 }
 $('#retry-reader').onclick=openBook;
-if(session())api('market-me').then(r=>{if(r.user.appearance?.design)window.akiliAppearance?.setPersonal(r.user.appearance);}).catch(()=>{});
 openBook();

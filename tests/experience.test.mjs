@@ -85,9 +85,9 @@ test('appearance accepts only the six designs and three modes',()=>{
  for(const design of ['classic','monochrome','glass','illustrative','soft','skeuomorphic'])for(const mode of ['normal','light','dark'])assert.deepEqual(appearance({design,mode}),{design,mode});
  for(const value of [{design:'evil',mode:'dark'},{design:'glass',mode:'javascript:'},null,[]])assert.throws(()=>appearance(value));
 });
-test('preferences update only the signed-in account and contain presentation values only',async()=>fixture(async calls=>{
- assert.equal((await req('market-preferences',{design:'glass',mode:'dark',role:'admin',userId:other})).status,200);
- const update=calls.find(c=>c.path==='/rest/v1/akili_profiles'&&c.opts.method==='PATCH');assert.ok(update.query.includes(actor));assert.deepEqual(JSON.parse(update.opts.body),{appearance:{design:'glass',mode:'dark'}});
+test('personal preferences are temporary and never replace the admin store default or profile',async()=>fixture(async calls=>{
+ const r=await req('market-preferences',{design:'glass',mode:'dark',role:'admin',userId:other});assert.equal(r.status,200);const value=await r.json();assert.equal(value.temporary,true);assert.equal(value.expires_in,1800);assert.deepEqual(value.appearance,{design:'glass',mode:'dark'});
+ assert.equal(calls.some(c=>c.opts.method==='PATCH'),false);
  assert.equal((await req('market-preferences',{design:'evil',mode:'dark'})).status,400);
 }));
 test('public book previews include an escaped book name and cover, without private PDF URLs or buyer data',async()=>fixture(async()=>{

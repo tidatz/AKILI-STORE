@@ -246,7 +246,7 @@ async function handle(event){
       const id=b.id?uuid(b.id):crypto.randomUUID();
       if(values.status==='published'){
         const existing=b.id?await one('ebook_books',eq('id',id)):null;
-        values.page_count=(await validatePublication({...existing,...values})).page_count;
+        Object.assign(values,await validatePublication({...existing,...values}));
       }
       if(values.featured){
         await patch('ebook_books','featured=eq.true',{featured:false});

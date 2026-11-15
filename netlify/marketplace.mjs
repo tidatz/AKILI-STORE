@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import {uploadKinds,storedBytes,pdfFiles,verifyCover} from './publication.mjs';
 import {appearance,publicAuthorLink,experienceAction,experienceReady} from './experience.mjs';
 import {HttpError,clean,isUuid,sha,randomToken,supa,rows,one,insert,patch,eq,assetUrl,signFile,adminUser} from './lib.mjs';
 import {smsConfigured,emailConfigured,invitationEmailConfigured,bulkValues,sendBulk,smsAccount,connectSmsApi,connectSmsWebhook,emailInvitation,siteOrigin} from './communications.mjs';
@@ -7,7 +8,7 @@ import {smsConfig,smsStatus} from './sms-config.mjs';
 const uuid=value=>{if(!isUuid(value))throw new HttpError(400,'Kitambulisho si sahihi.');return value;};
 const body=event=>{if((event.body||'').length>40000)throw new HttpError(413,'Taarifa ni nyingi.');try{return JSON.parse(event.body||'{}');}catch{throw new HttpError(400,'Taarifa si sahihi.');}};
 export const publicBook=b=>({id:b.id,slug:b.slug,title:b.title,subtitle:b.subtitle,description:b.description,price_tzs:b.price_tzs,cover_url:assetUrl(b.cover_path),author_name:b.author_name,category:b.category,language:b.language,page_count:b.page_count,has_preview:!!b.preview_path});
-const safeUser=u=>({id:u.id,email:u.email,display_name:u.profile.display_name,phone:u.profile.phone,bio:u.profile.bio,role:u.isAdmin?'admin':u.profile.role,status:u.profile.status,appearance:u.profile.appearance||{}});
+const safeUser=u=>({id:u.id,email:u.email,display_name:u.profile.display_name,phone:u.profile.phone,bio:u.profile.bio,role:u.isAdmin?'admin':u.profile.role,status:u.profile.status,appearance:{}});
 export async function currentUser(event,{optional=false}={}){
  const token=String(event.headers?.authorization||event.headers?.Authorization||'').replace(/^Bearer\s+/i,'');
  if(!token){if(optional)return null;throw new HttpError(401,'Ingia kwenye akaunti yako kuendelea.');}
@@ -46,29 +47,15 @@ export async function entitled(u,id){
  if(order?.status!=='paid'||order.user_id!==u.id)throw new HttpError(403,'Malipo hayajathibitishwa.');
  return access;
 }
-async function existsFile(bucket,path){
- if(!path)return false;
- try{await signFile(bucket,path,60);return true;}catch{return false;}
-}
 export async function validatePublication(b){
- if(!b.title?.trim()||!b.author_id||!b.author_name?.trim()||!b.category?.trim()||!Number.isSafeInteger(b.price_tzs)||b.price_tzs<500||!b.cover_path||!b.pdf_path||!b.preview_path)
-   throw new HttpError(400,'Kamilisha jina, mwandishi, kundi, bei, jalada, PDF na sampuli kabla ya kuchapisha.');
- const [cover,pdf,preview]=await Promise.all([existsFile('ebook-assets',b.cover_path),existsFile('ebook-pdfs',b.pdf_path),existsFile('ebook-previews',b.preview_path)]);
- if(!cover||!pdf||!preview)throw new HttpError(400,'Jalada, PDF au sampuli haijakamilika kupakiwa.');
+ if(!b.title?.trim()||!b.author_id||!b.author_name?.trim()||!b.category?.trim()||!Number.isSafeInteger(b.price_tzs)||b.price_tzs<500||!b.cover_path||!b.pdf_path)
+   throw new HttpError(400,'Kamilisha jina, mwandishi, kundi, bei, jalada na PDF kamili kabla ya kuchapisha.');
  const author=await one('akili_profiles',eq('user_id',b.author_id));
- if(!author||author.status!=='active'||(author.role!=='author'&&!await one('ebook_admins',eq('user_id',b.author_id))))
+ if(!author||author.status!=='active'||author.deleted_at||(author.role!=='author'&&!await one('ebook_admins',eq('user_id',b.author_id))))
    throw new HttpError(400,'Mwandishi lazima awe na akaunti iliyoidhinishwa na inayofanya kazi.');
- try {
-   const {PDFDocument}=await import('pdf-lib');
-   const [fullUrl,sampleUrl]=await Promise.all([signFile('ebook-pdfs',b.pdf_path,60),signFile('ebook-previews',b.preview_path,60)]);
-   const [fullResponse,sampleResponse]=await Promise.all([fetch(fullUrl,{signal:AbortSignal.timeout(20000)}),fetch(sampleUrl,{signal:AbortSignal.timeout(20000)})]);
-   if(!fullResponse.ok||!sampleResponse.ok)throw Error('download');
-   const [fullBytes,sampleBytes]=await Promise.all([fullResponse.arrayBuffer(),sampleResponse.arrayBuffer()]);
-   const [fullDoc,sampleDoc]=await Promise.all([PDFDocument.load(fullBytes),PDFDocument.load(sampleBytes)]);
-   if(sampleDoc.getPageCount()>4||sampleDoc.getPageCount()<1||sampleDoc.getPageCount()>=fullDoc.getPageCount())
-     throw new HttpError(400,'Sampuli iwe hadi kurasa nne na iwe fupi kuliko kitabu kamili.');
-   return {page_count:fullDoc.getPageCount()};
- } catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'PDF au sampuli haifunguki vizuri. Hakikisha faili ni PDF halisi lisilofungwa kwa nenosiri.');}
+ const [cover,files]=await Promise.all([storedBytes('ebook-assets',b.cover_path,uploadKinds.cover.max,'Jalada'),pdfFiles(b)]);
+ await verifyCover(cover);
+ return files;
 }
 const textFields=['slug','title','subtitle','description','author_name','category','language','cover_path','pdf_path','preview_path'];
 function bookValues(b){
@@ -84,6 +71,10 @@ export async function marketplace(event,action){
  if(action==='catalog'&&method==='GET'){
    const [books,settings]=await Promise.all([rows('ebook_books','select=*&status=eq.published&order=featured.desc,created_at.desc&limit=250'),one('ebook_site_settings','id=eq.1')]);
    return {experience_ready:await experienceReady(),books:books.map(publicBook),settings:{site_name:'AKILI STORE',hero_title:settings?.hero_title,hero_description:settings?.hero_description,primary_color:settings?.primary_color,contact:settings?.contact,support_email:settings?.support_email,about_author:settings?.about_author,about_book:settings?.about_book,contents:settings?.contents,author_avatar:assetUrl(settings?.logo_path),appearance:settings?.appearance||{design:'classic',mode:'normal'}},payments_enabled:process.env.SNIPPE_PAYMENTS_ENABLED==='true'};
+ }
+ if(action==='appearance'&&method==='GET'){
+   const settings=await one('ebook_site_settings','id=eq.1','appearance,primary_color');
+   return {appearance:settings?.appearance||{design:'classic',mode:'normal'},primary_color:settings?.primary_color||'#1D4ED8'};
  }
  if(action==='preview'&&method==='POST'){
    const b=body(event),book=await one('ebook_books',eq('id',uuid(b.bookId)));
@@ -136,7 +127,7 @@ export async function marketplace(event,action){
    const progress=await one('akili_reading_progress',eq('user_id',u.id)+'&'+eq('book_id',book.id));
    if(a.order_id)await insert('ebook_access_events',{order_id:a.order_id,event_type:b.purpose==='download'?'download_request':'reader_open'});
    else await audit(u,b.purpose==='download'?'access.download':'access.read',book.id);
-   return {title:book.title,url:await signFile('ebook-pdfs',book.pdf_path,300),filename:book.slug+'.pdf',slug:book.slug,page:progress?.page||1,appearance:u.profile.appearance||{}};
+   return {title:book.title,url:await signFile('ebook-pdfs',book.pdf_path,300),filename:book.slug+'.pdf',slug:book.slug,page:progress?.page||1,appearance:{}};
  }
  if(action==='market-progress'&&method==='POST'){
    await entitled(u,b.bookId);
@@ -176,7 +167,6 @@ export async function marketplace(event,action){
  }
  if(action==='market-save-book'&&method==='POST'){
    authorizeAuthor(u);const existing=b.id?await ownBook(u,b.id):null;
-   if(existing?.status==='submitted'&&!u.isAdmin)throw new HttpError(409,'Kitabu kinakaguliwa. Subiri uamuzi wa admin.');
    if(existing?.status==='published'&&!u.isAdmin)throw new HttpError(409,'Kitabu kimechapishwa. Wasiliana na admin kuomba marekebisho.');
    if(!b.slug&&b.title)b.slug=clean(b.title,200).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,100).replace(/-$/,'');
    const v=bookValues(b);if(!v.title||!v.slug||v.price_tzs===undefined)throw new HttpError(400,'Jaza jina, kiungo na bei.');
@@ -184,27 +174,52 @@ export async function marketplace(event,action){
    const id=existing?.id||crypto.randomUUID();
    for(const k of ['pdf_path','cover_path','preview_path'])if(!u.isAdmin&&v[k]&&!v[k].startsWith(id+'/'))throw new HttpError(403,'Faili halihusiani na kitabu hiki.');
    v.updated_at=new Date().toISOString();v.author_id=existing?.author_id||u.id;v.author_name=v.author_name||existing?.author_name||u.profile.display_name;v.status=existing?.status==='published'?'published':'draft';
-   if(v.status==='published')v.page_count=(await validatePublication({...existing,...v})).page_count;
+   if(v.status==='published')Object.assign(v,await validatePublication({...existing,...v}));
    if(existing)await insert('akili_product_versions',{book_id:id,actor_id:u.id,snapshot:existing});
    const result=existing?await patch('ebook_books',eq('id',id),v):await insert('ebook_books',{id,...v});
    await audit(u,'book.saved',id);return {book:result[0]};
  }
  if(action==='market-submit-book'&&method==='POST'){
-   const book=await ownBook(u,b.id);if(!['draft','changes_requested','rejected'].includes(book.status))throw new HttpError(409,'Kitabu hiki tayari kimewasilishwa au kuchapishwa.');
-   const verified=await validatePublication(book);await patch('ebook_books',eq('id',book.id),{page_count:verified.page_count,status:'submitted',moderation_note:'',updated_at:new Date().toISOString()});
-   await audit(u,'book.submitted',book.id);const admins=await rows('ebook_admins','select=user_id');
-   for(const a of admins)await notify(a.user_id,'Kitabu kipya cha kukagua',book.title,'/admin/books');return {submitted:true};
+   const book=await ownBook(u,b.id);
+   if(book.status==='published')return {published:true,already_published:true};
+   if(!['draft','changes_requested','rejected','submitted'].includes(book.status))throw new HttpError(409,'Rejesha kitabu kwenye rasimu kabla ya kukichapisha.');
+   const verified=await validatePublication(book);
+   await insert('akili_product_versions',{book_id:book.id,actor_id:u.id,snapshot:book});
+   await patch('ebook_books',eq('id',book.id),{...verified,status:'published',moderation_note:'',updated_at:new Date().toISOString()});
+   await audit(u,'book.published',book.id,{self_published:true});
+   await notify(u.id,'Kitabu chako kipo dukani',book.title,'/book/'+book.slug);
+   return {published:true};
  }
  if(action==='market-upload'&&method==='POST'){
    authorizeAuthor(u);const kind=clean(b.kind,20);const book=await ownBook(u,b.bookId);
-   if(!u.isAdmin&&!['draft','changes_requested','rejected'].includes(book.status))throw new HttpError(409,'Faili la kitabu hiki haliwezi kubadilishwa sasa.');
+   if(!u.isAdmin&&!['draft','changes_requested','rejected','submitted'].includes(book.status))throw new HttpError(409,'Faili la kitabu hiki haliwezi kubadilishwa sasa.');
    const image=kind==='cover',bucket=image?'ebook-assets':kind==='pdf'?'ebook-pdfs':kind==='preview'?'ebook-previews':null;
-   const ext=image?({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[b.mime]:b.mime==='application/pdf'?'pdf':null;
+   const mime=clean(b.mime,100).split(';')[0].trim().toLowerCase();
+   const ext=image?({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'})[mime]:mime==='application/pdf'?'pdf':null;
    const max=kind==='pdf'?52428800:10485760;
-   if(!bucket||!ext||!Number.isSafeInteger(b.size)||b.size<1||b.size>max)throw new HttpError(400,'Chagua picha hadi MB 10 au PDF hadi MB 50 (sampuli MB 10).');
+   if(!bucket||!ext)throw new HttpError(400,'Tumia PNG, JPG au WebP kwa jalada, na PDF kwa kitabu.');
+   if(!Number.isSafeInteger(b.size)||b.size<1||b.size>max)throw new HttpError(400,kind==='pdf'?'PDF kamili liwe hadi MB 50.':'Jalada au sampuli iwe hadi MB 10.');
    const path=book.id+'/'+crypto.randomUUID()+'.'+ext;
-   const signed=await supa('/storage/v1/object/upload/sign/'+bucket+'/'+path,{method:'POST',body:{}});
+   const signed=await supa('/storage/v1/object/upload/sign/'+bucket+'/'+path,{method:'POST',body:{upsert:true}});
    if(!signed?.url)throw new HttpError(502,'Upload haijaandaliwa.');return {path,url:new URL('/storage/v1'+signed.url,process.env.SUPABASE_URL).href};
+ }
+ if(action==='market-complete-upload'&&method==='POST'){
+   const book=await ownBook(u,b.bookId),kind=clean(b.kind,20),spec=uploadKinds[kind];
+   if(!u.isAdmin&&!['draft','changes_requested','rejected','submitted'].includes(book.status))throw new HttpError(409,'Kitabu hiki kimechapishwa. Wasiliana na admin kuomba marekebisho.');
+   if(!spec||typeof b.path!=='string'||!b.path.startsWith(book.id+'/')||!new RegExp('^'+book.id+'/[a-zA-Z0-9_-]+\\.(png|jpg|jpeg|webp|pdf)$').test(b.path))throw new HttpError(403,'Faili halihusiani na kitabu hiki.');
+   const bytes=await storedBytes(spec.bucket,b.path,spec.max,kind==='cover'?'Jalada':kind==='pdf'?'PDF kamili':'Sampuli');
+   let update={[spec.field]:b.path};
+   if(kind==='cover')await verifyCover(bytes);
+   else if(kind==='pdf')Object.assign(update,await pdfFiles({...book,pdf_path:b.path},{fullBytes:bytes,replacePreview:true}));
+   else{
+     if(!book.pdf_path)throw new HttpError(400,'Pakia PDF kamili kwanza. Sampuli itaandaliwa yenyewe.');
+     Object.assign(update,await pdfFiles({...book,preview_path:b.path},{sampleBytes:bytes}));
+   }
+   update.updated_at=new Date().toISOString();
+   await insert('akili_product_versions',{book_id:book.id,actor_id:u.id,snapshot:book});
+   const result=await patch('ebook_books',eq('id',book.id),update);
+   await audit(u,'book.file_uploaded',book.id,{kind});
+   return {book:{...result[0],cover_url:assetUrl(result[0].cover_path)},preview_generated:!!update.preview_path&&(kind==='pdf'||kind==='preview'&&update.preview_path!==b.path)};
  }
  if(action==='market-inspect-file'&&method==='POST'){
    const book=await ownBook(u,b.bookId);if(!['pdf','preview'].includes(b.kind))throw new HttpError(400,'Faili si sahihi.');
@@ -230,10 +245,13 @@ export async function marketplace(event,action){
  if(action==='market-admin-moderate'&&method==='POST'){
    const book=await one('ebook_books',eq('id',uuid(b.id)));if(!book)throw new HttpError(404,'Kitabu hakipo.');
    if(!['published','changes_requested','rejected','archived','draft'].includes(b.status))throw new HttpError(400,'Uamuzi si sahihi.');
+   if(b.status==='published'&&book.status==='published'&&!b.changes)return {saved:true,already_published:true};
    const note=clean(b.note,2000);if(['changes_requested','rejected'].includes(b.status)&&note.length<5)throw new HttpError(400,'Andika sababu ya uamuzi.');
-   const verified=b.status==='published'?await validatePublication(book):null;
+   const changes=b.status==='published'&&b.changes?bookValues(b.changes):{};
+   if(changes.slug&&changes.slug!==book.slug){const collision=await one('ebook_books',eq('slug',changes.slug),'id');if(collision&&collision.id!==book.id)throw new HttpError(409,'Kiungo hiki kimetumika. Ongeza neno jingine kwenye kiungo.');}
+   const verified=b.status==='published'?await validatePublication({...book,...changes}):null;
    await insert('akili_product_versions',{book_id:book.id,actor_id:u.id,snapshot:book});
-   await patch('ebook_books',eq('id',book.id),{status:b.status,moderation_note:note,...(verified?{page_count:verified.page_count}:{}),updated_at:new Date().toISOString()});
+   await patch('ebook_books',eq('id',book.id),{...changes,...verified,status:b.status,moderation_note:note,updated_at:new Date().toISOString()});
    await audit(u,'book.'+b.status,book.id,{note});await notify(book.author_id,'Uamuzi kuhusu kitabu chako',book.title+' — '+(note||b.status),'/author/books');return {saved:true};
  }
  if(action==='market-admin-invite'&&method==='POST'){

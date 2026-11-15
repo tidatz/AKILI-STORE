@@ -1,10 +1,10 @@
 # AKILI STORE — uthibitisho wa utendaji na maandalizi ya marketing
 
-14 Novemba 2026 · Mradi: tidatz/AKILI-STORE · www.akilistore.com
+15 Novemba 2026 · Mradi: tidatz/AKILI-STORE · www.akilistore.com
 
 ## Mtiririko unaohakikiwa
 
-Msomaji anafungua link ya jina la kitabu, anaona sampuli na bei, anaweka taarifa, analipia kupitia Snippe, kisha anasoma au kupakua. Akaunti yenye email iliyothibitishwa inaunganisha kitabu na maktaba. Admin anasimamia waandishi, roles na access; mwandishi anapakia rasimu, anawasilisha kwa ukaguzi na anaona mauzo halisi.
+Msomaji anafungua link ya jina la kitabu, anaona sampuli na bei, anaweka taarifa, analipia kupitia Snippe, kisha anasoma au kupakua. Akaunti yenye email iliyothibitishwa inaunganisha kitabu na maktaba. Admin anasimamia waandishi, roles na access; mwandishi anapakia rasimu, anachapisha moja kwa moja bila kusubiri admin na anaona mauzo halisi.
 
 ## Vipengele na ushahidi
 
@@ -18,9 +18,9 @@ Msomaji anafungua link ya jina la kitabu, anaona sampuli na bei, anaweka taarifa
 | Waandishi | Mwaliko wa email; reusable link zenye expiry, quota, revocation na acceptance ya mara moja kwa account | RPC na API tests; hakuna invitation email ya majaribio iliyotumwa |
 | Usalama wa mialiko | Server inathibitisha token na confirmed email; RPC hutumia profile inayosawazishwa na server | Auth rejection tests; hakuna SELECT ya auth.users iliyotolewa kwa service_role |
 | Uchapishaji | Jalada, full PDF na sample tofauti hukaguliwa; idadi ya kurasa hupimwa kutoka PDF | PDF tests; full PDF haiwezi kuchapishwa kama sample |
-| Editor ya mwandishi | Published/submitted book inaonekana bila kutoa fomu zinazoweza kushindwa kuhifadhi; admin anaweza kusimamia mabadiliko | DOM kwa author/admin |
+| Editor ya mwandishi | Published book hulindwa dhidi ya kubadilishwa na mwandishi; rasimu na zilizowahi kuwasilishwa zinaweza kuchapishwa moja kwa moja; admin anasimamia mabadiliko | DOM kwa author/admin |
 | Kushare | Public named URL na clipboard/native share; reader token haishirikishwi | Share tests na ukaguzi wa browser |
-| Muonekano | Mitindo sita, Light/Dark/Normal; preference inahifadhiwa kwenye akaunti, default kwenye duka; reduced motion | Enum/API tests, mode combinations na browser |
+| Muonekano | Mitindo sita, Light/Dark/Normal; admin anadhibiti default ya kudumu ya mfumo; personal choice ni session ya dakika 30 bila matumizi; reduced motion | Enum/API tests, mode combinations na browser |
 | Footer na forms | Footer haionekani kwenye dashboard, reader, auth, checkout na receipt; hakuna placeholders za mifano | DOM kwa guest, reader, author na admin |
 | Loading | Logo halisi, Welcome, AKILI STORE na pen/underline; mara moja kwa tab | Browser |
 | Marketing | Canonical URL, OG/Twitter previews, Book/WebSite structured data na dynamic sitemap ya published books | SEO tests; private pages zina noindex na no-store |
@@ -40,7 +40,7 @@ Tables mpya zina RLS, hakuna anon/authenticated table access, na RPC ni SECURITY
 
 ## Validation
 
-Vipimo 88 vya server/auth/payment/security/SEO vimepita, pamoja na syntax checks, build, DOM flows na database transaction checks. npm audit haikuonyesha vulnerabilities. Ukaguzi wa browser na HTTP wa production unahakiki rendering, metadata, redirects, private headers na upatikanaji wa kitabu kilicholipiwa.
+Vipimo 115 vya server/auth/payment/security/SEO vimepita, pamoja na syntax checks, build, DOM flows na database transaction checks. npm audit haikuonyesha vulnerabilities. Ukaguzi wa browser na HTTP wa production unahakiki rendering, metadata, redirects, private headers na upatikanaji wa kitabu kilicholipiwa.
 
 Hakuna mobile-money charge, payout, bulk SMS, ad au ujumbe wa majaribio kwa mtu mwingine uliotumwa na ukaguzi huu. Vipimo vya provider vinatumia mocks; manunuzi halisi yaliyokuwepo yamehakikiwa bila kubuni paid status.
 
@@ -51,3 +51,13 @@ Hakuna mobile-money charge, payout, bulk SMS, ad au ujumbe wa majaribio kwa mtu 
 - Google OAuth consent branding ni mpangilio wa Google/Supabase wa nje. Hakuna scope mpya au credential iliyoanzishwa wakati wa ukaguzi huu.
 - Supabase leaked password protection ina WARN. RLS-without-policy INFO ni ya tables za server pekee; unused-index INFO inatarajiwa kwa indexes mpya.
 - Huu ni uthibitisho wa kiufundi wa vipengele na ushahidi ulioelezwa. Hauwakilishi cheti cha mamlaka au ahadi ya nafasi kwenye search engines.
+
+## Maboresho ya 15 Novemba — PDF na uchapishaji wa moja kwa moja
+
+- Faili hutambuliwa kwa bytes badala ya kutegemea MIME ya simu. PDF zenye BOM au header ya scanner zinakubaliwa. Faili bovu au lenye nenosiri halitajwi kama hitilafu ya mtandao.
+- Upakiaji una progress, retry ya muda kwa signed path ileile, na button ya kujaribu tena. PDF lililopakiwa tayari halitumwi upya kama hatua ya kuambatisha pekee ndiyo iliyokwama.
+- Rasimu huundwa yenyewe faili likichaguliwa; hakuna sharti la Hifadhi rasimu kabla ya kuchagua mafaili. Kila faili linaambatishwa kwa update ya field husika ili lisiondoe faili jingine au maandishi ambayo bado yanaandikwa.
+- Kurasa hupimwa kutoka PDF. Sampuli ni ya hiari na hutengenezwa kutoka kurasa za mwanzo pekee; kitabu kizima kilichowekwa kama sampuli kinabadilishwa kuwa sampuli fupi. PDF kamili na sampuli hubaki kwenye buckets binafsi.
+- Mwandishi aliyeidhinishwa akibofya Chapisha kitabu, server huhakiki mafaili na kuweka published bila hali ya kusubiri admin. Admin ana button moja ya kuchapisha kutoka orodha au editor.
+- Muonekano wa account uliohifadhiwa zamani hautawali duka tena. Admin default husawazishwa kwenye kurasa na PDF reader; personal choice hurudi kwa default kwenye session mpya au baada ya dakika 30 bila matumizi.
+- Vipimo vya backend, aina za faili, sample generation, role boundaries, TTL ya muonekano na DOM ya author/admin vimepita. Hakuna malipo au SMS ya jaribio iliyoanzishwa.

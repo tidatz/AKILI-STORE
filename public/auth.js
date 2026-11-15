@@ -17,8 +17,8 @@ export async function api(action,body,retry=true){
  if(s?.refresh_token&&s.expires_at<Date.now()+60000)await refresh();
  s=session();
  let r;
- try{r=await fetch('/api?action='+encodeURIComponent(action),{signal:AbortSignal.timeout(30000),method:body?'POST':'GET',headers:{...(s?.access_token?{Authorization:'Bearer '+s.access_token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});}
- catch{const e=Error('Muunganisho umekatika. Taarifa zako zimehifadhiwa; jaribu tena.');e.status=503;throw e;}
+ try{r=await fetch('/api?action='+encodeURIComponent(action),{signal:AbortSignal.timeout(['market-complete-upload','market-admin-moderate','market-submit-book','market-save-book'].includes(action)?90000:30000),method:body?'POST':'GET',headers:{...(s?.access_token?{Authorization:'Bearer '+s.access_token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});}
+ catch{const e=Error('Muunganisho umekatika. Hatukuweza kuthibitisha ombi lako; jaribu tena.');e.status=503;throw e;}
  if(r.status===401&&retry&&s?.refresh_token){await refresh();return api(action,body,false);}
  const j=await r.json().catch(()=>({error:'Huduma haipatikani. Tafadhali jaribu tena.'}));
  if(!r.ok){const e=Error(j.error||'Imeshindikana. Jaribu tena.');e.status=r.status;throw e;}return j;

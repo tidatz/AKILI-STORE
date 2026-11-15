@@ -27,9 +27,8 @@ export async function publicAuthorLink(token){
 }
 export async function experienceAction(u,action,b,method){
  if(action==='market-preferences'&&method==='POST'){
-   const value=appearance(b,{inherit:true}),ready=await experienceReady();
-   if(ready)await patch('akili_profiles',eq('user_id',u.id),{appearance:value});
-   return {saved:true,appearance:value,local_only:!ready};
+   const value=appearance(b,{inherit:true});
+   return {saved:true,appearance:value,local_only:true,temporary:true,expires_in:1800};
  }
  if(action==='market-accept-author-link'&&method==='POST'){
    if(!await experienceReady())throw new HttpError(503,'Link mpya za waandishi zinasubiri uamilishaji wa database. Tumia mwaliko wa email wa admin kwa sasa.');
