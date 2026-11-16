@@ -4,6 +4,7 @@ import {appearance,publicAuthorLink,experienceAction,experienceReady} from './ex
 import {HttpError,clean,isUuid,sha,randomToken,supa,rows,one,insert,patch,eq,assetUrl,signFile,adminUser} from './lib.mjs';
 import {smsConfigured,emailConfigured,invitationEmailConfigured,bulkValues,sendBulk,smsAccount,connectSmsApi,connectSmsWebhook,emailInvitation,siteOrigin} from './communications.mjs';
 import {smsConfig,smsStatus} from './sms-config.mjs';
+import {affiliateAction,affiliateReady,publicAffiliateVisit} from './affiliates.mjs';
 
 const uuid=value=>{if(!isUuid(value))throw new HttpError(400,'Kitambulisho si sahihi.');return value;};
 const body=event=>{if((event.body||'').length>40000)throw new HttpError(413,'Taarifa ni nyingi.');try{return JSON.parse(event.body||'{}');}catch{throw new HttpError(400,'Taarifa si sahihi.');}};
@@ -68,6 +69,7 @@ function bookValues(b){
 }
 export async function marketplace(event,action){
  const method=event.httpMethod;
+ if(action==='affiliate-visit'&&method==='GET')return publicAffiliateVisit(event.queryStringParameters||{},event.headers||{});
  if(action==='catalog'&&method==='GET'){
    const [books,settings]=await Promise.all([rows('ebook_books','select=*&status=eq.published&order=featured.desc,created_at.desc&limit=250'),one('ebook_site_settings','id=eq.1')]);
    return {experience_ready:await experienceReady(),books:books.map(publicBook),settings:{site_name:'AKILI STORE',hero_title:settings?.hero_title,hero_description:settings?.hero_description,primary_color:settings?.primary_color,contact:settings?.contact,support_email:settings?.support_email,about_author:settings?.about_author,about_book:settings?.about_book,contents:settings?.contents,author_avatar:assetUrl(settings?.logo_path),appearance:settings?.appearance||{design:'classic',mode:'normal'}},payments_enabled:process.env.SNIPPE_PAYMENTS_ENABLED==='true'};
@@ -90,6 +92,7 @@ export async function marketplace(event,action){
  if(action==='author-link'&&method==='POST')return publicAuthorLink(body(event).token);
  if(!action.startsWith('market-'))return undefined;
  const u=await currentUser(event),b=method==='POST'?body(event):{};
+ const affiliateResult=await affiliateAction(u,action,b,method);if(affiliateResult!==undefined)return affiliateResult;
  const experience=await experienceAction(u,action,b,method);if(experience!==undefined)return experience;
  if(action==='market-me'&&method==='GET'){
    const pending=!u.isAdmin&&u.profile.role==='reader'?await one('akili_author_invitations',eq('email',u.email.toLowerCase())+'&accepted_at=is.null&expires_at=gt.'+encodeURIComponent(new Date().toISOString())+'&order=created_at.desc','id'):null;
