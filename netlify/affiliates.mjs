@@ -39,6 +39,8 @@ export async function publicAffiliateVisit(params,headers={}){
     const rule=await one('akili_affiliate_product_rules',eq('product_id',productId)+'&active=eq.true');
     rate=Number(rule?.commission_percent_of_platform||0);
   }
+  const recent=await rows('akili_affiliate_clicks','select=id&'+eq('affiliate_id',affiliate.id)+'&created_at=gte.'+encodeURIComponent(new Date(Date.now()-5*60000).toISOString())+'&limit=50');
+  if(recent.length>=50)throw new HttpError(429,'Link hii imetembelewa mara nyingi kwa muda mfupi. Jaribu baadaye.');
   const token=randomToken();
   const referrer=(()=>{try{return new URL(headers.referer||headers.referrer||'').hostname.slice(0,160);}catch{return '';}})();
   const landing=clean(params?.landing,300);
@@ -96,7 +98,7 @@ export async function affiliateAction(u,action,b,method){
     const [clicks,ledger,campaigns,books,rules,withdrawals,settings]=await Promise.all([
       rows('akili_affiliate_clicks','select=id,campaign_id,product_id,created_at,expires_at&'+eq('affiliate_id',affiliate.id)+'&order=created_at.desc&limit=100'),
       rows('akili_ledger','select=order_id,amount_tzs,created_at,campaign_id&account=eq.affiliate&'+eq('affiliate_id',affiliate.id)+'&order=created_at.desc&limit=300'),
-      rows('akili_affiliate_campaigns','select=name,code,product_id,starts_at,ends_at&status=eq.active&order=created_at.desc&limit=100'),
+      rows('akili_affiliate_campaigns','select=name,code,product_id,starts_at,ends_at,commission_percent_of_platform&status=eq.active&order=created_at.desc&limit=100'),
       rows('ebook_books','select=id,title,slug,price_tzs&status=eq.published&order=title.asc&limit=250'),
       rows('akili_affiliate_product_rules','select=product_id,commission_percent_of_platform&active=eq.true'),
       rows('akili_withdrawals','select=*&'+eq('user_id',u.id)+'&order=created_at.desc&limit=100'),
@@ -147,6 +149,13 @@ export async function affiliateAction(u,action,b,method){
     await insert('akili_audit_logs',{actor_id:u.id,action:'affiliate.campaign_created',target_id:result[0].id,details:{code,rate,product_id:productId}});
     return {campaign:result[0]};
   }
+  if(action==='market-admin-affiliate-campaign-rate'&&method==='POST'){
+    const id=uuid(b.id),rate=pct(b.commission_percent_of_platform);
+    const result=await patch('akili_affiliate_campaigns',eq('id',id),{commission_percent_of_platform:rate,updated_at:new Date().toISOString()});
+    if(!result.length)throw new HttpError(404,'Kampeni haijapatikana.');
+    await insert('akili_audit_logs',{actor_id:u.id,action:'affiliate.campaign_rate_updated',target_id:id,details:{rate}});
+    return {saved:true,campaign:result[0]};
+  }
   if(action==='market-admin-affiliate-campaign-status'&&method==='POST'){
     const id=uuid(b.id),status=b.status;
     if(!['active','paused','ended','draft'].includes(status))throw new HttpError(400,'Hali ya kampeni si sahihi.');
@@ -159,8 +168,8 @@ export async function affiliateAction(u,action,b,method){
     const productId=uuid(b.product_id),rate=pct(b.commission_percent_of_platform),active=b.active!==false;
     const product=await one('ebook_books',eq('id',productId),'id,status');if(!product||product.status!=='published')throw new HttpError(400,'Chagua bidhaa iliyochapishwa.');
     const existing=await one('akili_affiliate_product_rules',eq('product_id',productId));
-    const values={commission_percent_of_platform:rate,active:!(b.active===false||b.active==='false'),updated_at:new Date().toISOString(),created_by:u.id};
-    const result=existing?await patch('akili_affiliate_product_rules',eq('product_id',productId),values):await insert('akili_affiliate_product_rules',{product_id:productId,...values});
+    const values={commission_percent_of_platform:rate,active:!(b.active===false||b.active==='false'),updated_at:new Date().toISOString()};
+    const result=existing?await patch('akili_affiliate_product_rules',eq('product_id',productId),values):await insert('akili_affiliate_product_rules',{product_id:productId,...values,created_by:u.id});
     await insert('akili_audit_logs',{actor_id:u.id,action:'affiliate.product_rule_updated',target_id:productId,details:{rate,active}});
     return {saved:true,rule:result[0]};
   }
