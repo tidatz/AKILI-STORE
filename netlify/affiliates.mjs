@@ -77,6 +77,7 @@ export async function attachAffiliateOrder(order,token,productId){
 }
 
 export async function affiliateAction(u,action,b,method){
+  if(!['market-affiliate-apply','market-affiliate-data'].includes(action)&&!action.startsWith('market-admin-affiliate-'))return undefined;
   if(!(await affiliateReady()))throw new HttpError(503,'Affiliate engine bado inasubiri migration ya database.');
   if(action==='market-affiliate-apply'&&method==='POST'){
     const existing=await one('akili_affiliates',eq('user_id',u.id));
