@@ -126,3 +126,53 @@
  .dash-top .dash-store-name{display:none}
 }
 @media(max-width:360px){.topbar .wordmark{font-size:16px}.topbar .brand-logo{width:34px;height:29px}}
+
+
+/* Author product editor: guided, mobile-first three-step workflow. */
+.author-editor{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:22px;align-items:start}
+.author-editor>div:first-of-type{min-width:0}
+.editor-stepper{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:0 0 4px}
+.editor-stepper>span{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--muted);min-width:0}
+.editor-stepper b{display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:50%;background:#f1f3f7;color:var(--ink);font-size:12px}
+.editor-stepper small{font-size:13px;font-weight:600}
+.editor-stepper [aria-current=step]{border-color:#b9c9ee;background:#f6f8ff;color:var(--ink)}
+.editor-stepper [aria-current=step] b,.editor-stepper .done b{background:var(--accent);color:#fff}
+.author-editor .author-step[hidden],.author-editor .editor-step-actions[hidden]{display:none!important}
+.author-editor .editor-step-actions{margin:0;padding:4px 0 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.author-editor .editor-step-actions .btn,.author-editor .editor-actions .btn{min-height:46px}
+.author-editor .editor-review{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:20px 0}
+.author-editor .editor-review>div,.author-editor .editor-checklist>div{padding:13px;border:1px solid var(--line);border-radius:9px;background:#fff;min-width:0}
+.author-editor .editor-review span,.author-editor .editor-checklist span{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}
+.author-editor .editor-review strong,.author-editor .editor-checklist strong{display:block;font-size:14px;overflow-wrap:anywhere}
+.author-editor .editor-checklist{display:grid;gap:9px}
+.author-editor .editor-checklist>div{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.author-editor .editor-checklist strong{font-size:12px;color:#9a5a13;text-align:right}
+.author-editor .editor-checklist .complete strong{color:var(--green)}
+.author-editor .editor-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:20px}
+.author-editor .editor-actions .btn{flex:0 1 auto}
+.author-editor .file-upload{padding:16px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.author-editor .file-upload input[type=file]{display:block;width:100%;max-width:100%;margin-top:12px;font-size:13px}
+.author-editor .file-upload progress{display:block;width:100%;height:8px;margin:12px 0 4px;accent-color:var(--accent)}
+.author-editor .file-state{display:block;margin-top:8px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.author-editor .file-upload .btn{margin-top:10px;min-height:42px}
+@media(max-width:900px){.author-editor{grid-template-columns:minmax(0,1fr)}.author-editor .editor-aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.author-editor .editor-aside>.panel{margin:0}}
+@media(max-width:600px){.editor-stepper{gap:6px}.editor-stepper>span{padding:9px 7px;gap:6px;flex-direction:column;align-items:flex-start}.editor-stepper b{width:27px;height:27px}.editor-stepper small{font-size:11px}.author-editor .editor-review{grid-template-columns:1fr}.author-editor .editor-checklist>div{align-items:flex-start;flex-direction:column;gap:3px}.author-editor .editor-checklist strong{text-align:left}.author-editor .editor-aside{grid-template-columns:1fr}.author-editor .editor-step-actions{align-items:stretch;flex-direction:column}.author-editor .editor-step-actions .btn,.author-editor .editor-actions .btn{width:100%}.author-editor .editor-actions{display:grid;grid-template-columns:1fr;width:100%}}
+
+/* Continuous book-cover train on the storefront homepage. */
+.book-train{padding:8px 0 34px;overflow:hidden}
+.book-train .section-head{align-items:flex-end;margin-bottom:24px}
+.book-train .section-head h2{font-size:25px;margin:0 0 6px}
+.book-train .section-head p{font-size:13px;color:var(--muted);margin:0}
+.book-train-viewport{width:100%;overflow:hidden;position:relative;mask-image:linear-gradient(90deg,transparent 0,#000 3%,#000 97%,transparent 100%);-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 3%,#000 97%,transparent 100%)}
+.book-train-track{display:flex;width:max-content;align-items:stretch;animation:book-train-move var(--train-duration,48s) linear infinite;will-change:transform}
+.book-train-group{display:flex;align-items:flex-start;gap:22px;flex:none;padding-right:22px}
+.book-train-card{display:flex;flex-direction:column;flex:none;width:164px;min-width:0;gap:7px;color:var(--ink);text-decoration:none}
+.book-train-cover{height:218px;width:164px;display:flex;align-items:center;justify-content:center;padding:10px;background:#f4f6fa;border:1px solid #e9edf4;border-radius:9px;overflow:hidden}
+.book-train-cover img{height:100%;width:100%;object-fit:contain;filter:drop-shadow(5px 7px 5px #0b17351c);transition:transform .25s ease}
+.book-train-card:hover .book-train-cover img,.book-train-card:focus-visible .book-train-cover img{transform:translateY(-4px) scale(1.025)}
+.book-train-title{font-size:13px;font-weight:700;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.book-train-author{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book-train-viewport:hover .book-train-track,.book-train-viewport:focus-within .book-train-track{animation-play-state:paused}
+@keyframes book-train-move{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(max-width:680px){.book-train{padding-top:2px}.book-train .section-head{align-items:flex-start;gap:10px}.book-train .section-head h2{font-size:21px}.book-train .section-head>a{white-space:nowrap}.book-train-group{gap:14px;padding-right:14px}.book-train-card{width:126px;gap:6px}.book-train-cover{width:126px;height:174px;padding:8px}.book-train-title{font-size:12px}.book-train-author{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.book-train-track{animation:none!important;transform:none!important}.book-train-viewport{overflow-x:auto;mask-image:none;-webkit-mask-image:none}.book-train-group[aria-hidden=true]{display:none}}
