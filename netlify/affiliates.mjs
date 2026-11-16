@@ -25,7 +25,7 @@ export async function publicAffiliateVisit(params,headers={}){
     const now=Date.now();
     if(!campaign||campaign.status!=='active'||Date.parse(campaign.starts_at)>now||
       campaign.ends_at&&Date.parse(campaign.ends_at)<=now)throw new HttpError(404,'Kampeni hii haipo au imefungwa.');
-    if(campaign.product_id&&campaign.product_id!==params.product)throw new HttpError(400,'Kampeni hii imefungwa kwa bidhaa maalumu.');
+    if(campaign.product_id&&params.product&&campaign.product_id!==params.product)throw new HttpError(400,'Kampeni hii imefungwa kwa bidhaa maalumu.');
     rate=Number(campaign.commission_percent_of_platform);
     productId=campaign.product_id||null;
   }
@@ -60,6 +60,8 @@ export async function attachAffiliateOrder(order,token,productId){
     click.product_id&&click.product_id!==productId)throw new HttpError(400,'Link ya affiliate imeisha au haihusiani na bidhaa hii.');
   const affiliate=await one('akili_affiliates',eq('id',click.affiliate_id));
   if(!affiliate||affiliate.status!=='active')throw new HttpError(400,'Affiliate huyu hayupo active.');
+  const profile=await one('akili_profiles',eq('user_id',affiliate.user_id),'user_id,email');
+  if(order.user_id===affiliate.user_id||profile?.email&&profile.email.toLowerCase()===String(order.customer_email||'').toLowerCase())throw new HttpError(400,'Self-referral hairuhusiwi.');
   const existing=await one('akili_order_attributions',eq('order_id',order.id));
   if(existing)return {attributed:existing.affiliate_id===affiliate.id};
   try{
@@ -91,12 +93,24 @@ export async function affiliateAction(u,action,b,method){
   if(action==='market-affiliate-data'&&method==='GET'){
     const affiliate=await one('akili_affiliates',eq('user_id',u.id));
     if(!affiliate||affiliate.status!=='active')return {status:affiliate?.status||'not_applied'};
-    const [clicks,ledger,campaigns]=await Promise.all([
+    const [clicks,ledger,campaigns,books,rules,withdrawals,settings]=await Promise.all([
       rows('akili_affiliate_clicks','select=id,campaign_id,product_id,created_at,expires_at&'+eq('affiliate_id',affiliate.id)+'&order=created_at.desc&limit=100'),
       rows('akili_ledger','select=order_id,amount_tzs,created_at,campaign_id&account=eq.affiliate&'+eq('affiliate_id',affiliate.id)+'&order=created_at.desc&limit=300'),
-      rows('akili_affiliate_campaigns','select=name,code,product_id,starts_at,ends_at&status=eq.active&order=created_at.desc&limit=100')
+      rows('akili_affiliate_campaigns','select=name,code,product_id,starts_at,ends_at&status=eq.active&order=created_at.desc&limit=100'),
+      rows('ebook_books','select=id,title,slug,price_tzs&status=eq.published&order=title.asc&limit=250'),
+      rows('akili_affiliate_product_rules','select=product_id,commission_percent_of_platform&active=eq.true'),
+      rows('akili_withdrawals','select=*&'+eq('user_id',u.id)+'&order=created_at.desc&limit=100'),
+      one('ebook_site_settings','id=eq.1','withdrawal_min_tzs,withdrawal_fee_tzs')
     ]);
-    return {status:'active',code:affiliate.code,clicks:clicks.length,ledger,earned:ledger.reduce((s,x)=>s+x.amount_tzs,0),campaigns};
+    const earned=ledger.reduce((s,x)=>s+x.amount_tzs,0),reserved=withdrawals.filter(x=>x.status!=='declined').reduce((s,x)=>s+x.amount_tzs,0);
+    return {status:'active',code:affiliate.code,clicks:clicks.length,ledger,earned,available:earned-reserved,campaigns,books,rules,withdrawals,policy:settings};
+  }
+  if(action==='market-affiliate-withdraw'&&method==='POST'){
+    const amount=Number(b.amount_tzs);let phone=clean(b.phone,25).replace(/[^0-9]/g,'');if(phone.startsWith('0'))phone='255'+phone.slice(1);
+    if(!Number.isSafeInteger(amount)||!/^255\\d{9}$/.test(phone))throw new HttpError(400,'Jaza kiasi na namba sahihi.');
+    await supa('/rest/v1/rpc/akili_request_withdrawal',{method:'POST',body:{p_user_id:u.id,p_amount:amount,p_phone:phone}});
+    await insert('akili_audit_logs',{actor_id:u.id,action:'affiliate.withdrawal_requested',target_id:u.id,details:{amount_tzs:amount}});
+    return {requested:true};
   }
   if(!action.startsWith('market-admin-affiliate-'))return undefined;
   if(!u.isAdmin)throw new HttpError(403,'Huna ruhusa ya admin.');
@@ -145,7 +159,7 @@ export async function affiliateAction(u,action,b,method){
     const productId=uuid(b.product_id),rate=pct(b.commission_percent_of_platform),active=b.active!==false;
     const product=await one('ebook_books',eq('id',productId),'id,status');if(!product||product.status!=='published')throw new HttpError(400,'Chagua bidhaa iliyochapishwa.');
     const existing=await one('akili_affiliate_product_rules',eq('product_id',productId));
-    const values={commission_percent_of_platform:rate,active,updated_at:new Date().toISOString(),created_by:u.id};
+    const values={commission_percent_of_platform:rate,active:!(b.active===false||b.active==='false'),updated_at:new Date().toISOString(),created_by:u.id};
     const result=existing?await patch('akili_affiliate_product_rules',eq('product_id',productId),values):await insert('akili_affiliate_product_rules',{product_id:productId,...values});
     await insert('akili_audit_logs',{actor_id:u.id,action:'affiliate.product_rule_updated',target_id:productId,details:{rate,active}});
     return {saved:true,rule:result[0]};
