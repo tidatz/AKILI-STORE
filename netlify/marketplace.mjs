@@ -92,6 +92,7 @@ export async function marketplace(event,action){
  if(action==='author-link'&&method==='POST')return publicAuthorLink(body(event).token);
  if(!action.startsWith('market-'))return undefined;
  const u=await currentUser(event),b=method==='POST'?body(event):{};
+ const affiliateResult=await affiliateAction(u,action,b,method);if(affiliateResult!==undefined)return affiliateResult;
  const experience=await experienceAction(u,action,b,method);if(experience!==undefined)return experience;
  if(action==='market-me'&&method==='GET'){
    const pending=!u.isAdmin&&u.profile.role==='reader'?await one('akili_author_invitations',eq('email',u.email.toLowerCase())+'&accepted_at=is.null&expires_at=gt.'+encodeURIComponent(new Date().toISOString())+'&order=created_at.desc','id'):null;
