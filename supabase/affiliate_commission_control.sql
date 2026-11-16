@@ -115,7 +115,7 @@ begin
     select * into b from public.ebook_books where id=o.book_id;
     select author_percent into rate from public.ebook_site_settings where id=1;
     author_share:=floor(p_amount*coalesce(rate,60)/100.0)::integer;
-    system_share:=floor(p_amount*0.10)::integer;
+    system_share:=least(floor(p_amount*0.10)::integer,greatest(0,p_amount-author_share));
     platform_share:=p_amount-author_share-system_share;
     affiliate_share:=0;
     select * into attribution from public.akili_order_attributions where order_id=o.id;
@@ -145,5 +145,30 @@ begin
 end $$;
 revoke all on function public.ebook_apply_payment_event(text,text,uuid,text,integer,text) from public,anon,authenticated;
 grant execute on function public.ebook_apply_payment_event(text,text,uuid,text,integer,text) to service_role;
+
+
+-- Preserve author withdrawals and allow approved affiliates to withdraw their
+-- commission balance through the same audited payout queue.
+create or replace function public.akili_request_withdrawal(p_user_id uuid,p_amount integer,p_phone text)
+returns uuid language plpgsql security invoker set search_path=public,pg_temp as $
+declare earned bigint; reserved bigint; minimum integer; fee integer; result uuid; affiliate_key uuid; profile_status text;
+begin
+ perform pg_advisory_xact_lock(hashtextextended(p_user_id::text,1));
+ select status into profile_status from public.akili_profiles where user_id=p_user_id;
+ select id into affiliate_key from public.akili_affiliates where user_id=p_user_id and status='active';
+ if profile_status is distinct from 'active' or not exists(
+   select 1 from public.akili_profiles where user_id=p_user_id and role='author'
+ ) and affiliate_key is null then raise exception 'Author or active affiliate required'; end if;
+ select withdrawal_min_tzs,withdrawal_fee_tzs into minimum,fee from public.ebook_site_settings where id=1;
+ select coalesce(sum(amount_tzs),0) into earned from public.akili_ledger
+ where (account='author' and author_id=p_user_id)
+    or (account='affiliate' and affiliate_id=affiliate_key and affiliate_key is not null);
+ select coalesce(sum(amount_tzs),0) into reserved from public.akili_withdrawals where user_id=p_user_id and status in ('pending','paid');
+ if p_amount<minimum or p_amount<=fee or p_amount>earned-reserved or p_phone!~'^255[0-9]{9} then raise exception 'Invalid withdrawal or insufficient balance'; end if;
+ insert into public.akili_withdrawals(user_id,amount_tzs,fee_tzs,phone) values(p_user_id,p_amount,fee,p_phone) returning id into result;
+ return result;
+end $;
+revoke all on function public.akili_request_withdrawal(uuid,integer,text) from public,anon,authenticated;
+grant execute on function public.akili_request_withdrawal(uuid,integer,text) to service_role;
 
 commit;
