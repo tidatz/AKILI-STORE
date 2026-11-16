@@ -107,7 +107,7 @@ export async function affiliateAction(u,action,b,method){
   }
   if(action==='market-affiliate-withdraw'&&method==='POST'){
     const amount=Number(b.amount_tzs);let phone=clean(b.phone,25).replace(/[^0-9]/g,'');if(phone.startsWith('0'))phone='255'+phone.slice(1);
-    if(!Number.isSafeInteger(amount)||!/^255\\d{9}$/.test(phone))throw new HttpError(400,'Jaza kiasi na namba sahihi.');
+    if(!Number.isSafeInteger(amount)||!/^255\d{9}$/.test(phone))throw new HttpError(400,'Jaza kiasi na namba sahihi.');
     await supa('/rest/v1/rpc/akili_request_withdrawal',{method:'POST',body:{p_user_id:u.id,p_amount:amount,p_phone:phone}});
     await insert('akili_audit_logs',{actor_id:u.id,action:'affiliate.withdrawal_requested',target_id:u.id,details:{amount_tzs:amount}});
     return {requested:true};
