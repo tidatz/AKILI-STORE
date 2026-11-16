@@ -95,17 +95,17 @@ export async function affiliateAction(u,action,b,method){
   if(action==='market-affiliate-data'&&method==='GET'){
     const affiliate=await one('akili_affiliates',eq('user_id',u.id));
     if(!affiliate||affiliate.status!=='active')return {status:affiliate?.status||'not_applied'};
-    const [clicks,ledger,campaigns,books,rules,withdrawals,settings]=await Promise.all([
-      rows('akili_affiliate_clicks','select=id,campaign_id,product_id,created_at,expires_at&'+eq('affiliate_id',affiliate.id)+'&order=created_at.desc&limit=100'),
+    const [ledger,campaigns,books,rules,withdrawals,settings,summaryRows]=await Promise.all([
       rows('akili_ledger','select=order_id,amount_tzs,created_at,campaign_id&account=eq.affiliate&'+eq('affiliate_id',affiliate.id)+'&order=created_at.desc&limit=300'),
       rows('akili_affiliate_campaigns','select=name,code,product_id,starts_at,ends_at,commission_percent_of_platform&status=eq.active&order=created_at.desc&limit=100'),
       rows('ebook_books','select=id,title,slug,price_tzs&status=eq.published&order=title.asc&limit=250'),
       rows('akili_affiliate_product_rules','select=product_id,commission_percent_of_platform&active=eq.true'),
       rows('akili_withdrawals','select=*&'+eq('user_id',u.id)+'&order=created_at.desc&limit=100'),
-      one('ebook_site_settings','id=eq.1','withdrawal_min_tzs,withdrawal_fee_tzs')
+      one('ebook_site_settings','id=eq.1','withdrawal_min_tzs,withdrawal_fee_tzs'),
+      supa('/rest/v1/rpc/akili_affiliate_summary',{method:'POST',body:{p_user_id:u.id}})
     ]);
-    const earned=ledger.reduce((s,x)=>s+x.amount_tzs,0),reserved=withdrawals.filter(x=>x.status!=='declined').reduce((s,x)=>s+x.amount_tzs,0);
-    return {status:'active',code:affiliate.code,clicks:clicks.length,ledger,earned,available:earned-reserved,campaigns,books,rules,withdrawals,policy:settings};
+    const summary=Array.isArray(summaryRows)?summaryRows[0]:summaryRows;
+    return {status:'active',code:affiliate.code,clicks:Number(summary?.clicks||0),ledger,earned:Number(summary?.earned||0),available:Number(summary?.available||0),campaigns,books,rules,withdrawals,policy:settings};
   }
   if(action==='market-affiliate-withdraw'&&method==='POST'){
     const amount=Number(b.amount_tzs);let phone=clean(b.phone,25).replace(/[^0-9]/g,'');if(phone.startsWith('0'))phone='255'+phone.slice(1);
