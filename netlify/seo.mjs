@@ -14,12 +14,12 @@ export function decorate(html,{title,description,url,image,type='website',schema
  const h=escapeHtml;
  const meta=`<link rel="canonical" href="${h(url)}"><meta property="og:type" content="${h(type)}"><meta property="og:site_name" content="AKILI STORE"><meta property="og:locale" content="sw_TZ"><meta property="og:title" content="${h(title)}"><meta property="og:description" content="${h(description)}"><meta property="og:url" content="${h(url)}">${image?`<meta property="og:image" content="${h(image)}"><meta property="og:image:alt" content="${h(title)}">`:''}<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${h(title)}"><meta name="twitter:description" content="${h(description)}">${image?`<meta name="twitter:image" content="${h(image)}">`:''}`;
  const structured=schema?'<script type="application/ld+json">'+JSON.stringify(schema).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026')+'</script>':'';
- return html.replace(/<title>[\\s\\S]*?<\\/title>/i,'<title>'+h(title)+'</title>').replace(/<meta name="description" content="[^"]*">/i,'<meta name="description" content="'+h(description)+'">').replace('</head>',meta+structured+'</head>');
+ return html.replace(/<title>[\s\S]*?<\/title>/i,'<title>'+h(title)+'</title>').replace(/<meta name="description" content="[^"]*">/i,'<meta name="description" content="'+h(description)+'">').replace('</head>',meta+structured+'</head>');
 }
 function withServerContent(html,content){
  // Replace the complete loading shell up to the next stable sibling; this keeps
  // the same #app mount point so the client application can take over normally.
- return html.replace(/<div id="app">[\\s\\S]*?(?=<div id="toast")/, '<div id="app">'+content+'</div>');
+ return html.replace(/<div id="app">[\s\S]*?(?=<div id="toast")/, '<div id="app">'+content+'</div>');
 }
 const money=value=>'TSh '+Number(value||0).toLocaleString('en-US');
 function serverBookCard(book){
@@ -56,7 +56,7 @@ export async function bookPage(slug){
  let book;try{book=valid?await one('ebook_books',eq('slug',slug)+'&status=eq.published','title,slug,description,subtitle,cover_path,price_tzs,author_name,category,page_count,language'):null;}catch{return unavailablePage(html);}
  if(!book)return {statusCode:404,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'},body:html.replace('</head>','<meta name="robots" content="noindex"></head>')};
  const origin=siteOrigin(),url=origin+'/book/'+encodeURIComponent(book.slug),image=assetUrl(book.cover_path);
- const title=book.title+' | AKILI STORE',description=(book.description||book.subtitle||'Nunua na soma kitabu kwenye AKILI STORE.').replace(/\\s+/g,' ').slice(0,180);
+ const title=book.title+' | AKILI STORE',description=(book.description||book.subtitle||'Nunua na soma kitabu kwenye AKILI STORE.').replace(/\s+/g,' ').slice(0,180);
  return {statusCode:200,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'public, max-age=0, s-maxage=60, stale-while-revalidate=120'},body:decorate(withServerContent(html,bookContent(book)),{title,description,url,image,type:'book',schema:bookSchema(book)})};
 }
 export async function sitemap(){
