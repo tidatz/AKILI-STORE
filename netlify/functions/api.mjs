@@ -89,7 +89,7 @@ async function handle(event){
         if(!order||order.user_id!==(buyer?.id||null)||order.checkout_secret_hash!==sha(b.clientSecret)||order.book_id!==bookId||order.customer_email!==email||order.customer_phone!==phone||!!order.verification_test!==verification)throw error;
       }
     }
-    if(!verification&&b.referralToken)await attachAffiliateOrder(order,b.referralToken,bookId);
+    if(!verification&&b.referralToken){try{await attachAffiliateOrder(order,b.referralToken,bookId);}catch(error){console.error('Affiliate attribution was not attached:',error.message);}}
     const existing=await one('ebook_payments',eq('order_id',order.id));
     if(existing)return ok({orderId:order.id,status:order.status,amount_tzs:order.amount_tzs});
     const words=order.customer_name.split(/\s+/);
