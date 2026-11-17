@@ -55,3 +55,12 @@ Supabase Auth handles registration and recovery email separately; verify its sen
 ## Bulk SMS
 
 See [EHUB_SETUP.md](EHUB_SETUP.md). Admin → Ujumbe wa SMS now includes mobile forms for API key/secret and webhook signing secret. Server-side sender discovery removes the UUID entry step; credentials are encrypted in Supabase Vault with server-only RPC access. The eHub account already has an approved **AKILI STORE** sender and an active key with that name. The owner must still enter the existing credentials, register the webhook and complete a controlled delivery check. No real messages have been sent during development.
+
+
+## Branded sign-in and activity notifications
+
+The application now supports a separate server-provided `SUPABASE_AUTH_URL` for browser-side Auth requests. It defaults to the existing project URL, so login is not disrupted. To remove the Supabase hostname from the visible Auth/OAuth flow, first activate the Supabase paid custom domain `auth.akilistore.com`, configure its required CNAME and TXT records in DNS, add the custom callback URL to Google OAuth, then set `SUPABASE_AUTH_URL=https://auth.akilistore.com` in Vercel Production and redeploy. Do not set this variable before Supabase confirms the custom domain is active. The normal website and post-login redirects already use `https://www.akilistore.com`.
+
+Author activity emails use Resend and require the server-only Production variables `RESEND_API_KEY` and `EMAIL_FROM`; the sender domain must be verified in Resend. A successful book sale sends the author the book title, confirmed sale price, and recorded author share, and creates an in-app notification. Book moderation decisions also send activity emails. Delivery keys prevent duplicate sale emails. If Resend is not configured, in-app notifications still work and no email is falsely reported as sent.
+
+Author verification SMS is deliberately separate from bulk SMS and purchase alerts. It is sent only once after a verified invitation is accepted and the profile is officially assigned the author role. Enable it by setting `EHUB_AUTHOR_VERIFICATION_SMS_ENABLED=true` in Vercel Production after the approved AKILI STORE sender, API credentials and balance are ready. No SMS is sent for book sales or ordinary reader activity. Add the variable only when the owner wants this paid message to be sent.

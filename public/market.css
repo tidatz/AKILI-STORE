@@ -176,3 +176,7 @@
 @keyframes book-train-move{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media(max-width:680px){.book-train{padding-top:2px}.book-train .section-head{align-items:flex-start;gap:10px}.book-train .section-head h2{font-size:21px}.book-train .section-head>a{white-space:nowrap}.book-train-group{gap:14px;padding-right:14px}.book-train-card{width:126px;gap:6px}.book-train-cover{width:126px;height:174px;padding:8px}.book-train-title{font-size:12px}.book-train-author{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.book-train-track{animation:none!important;transform:none!important}.book-train-viewport{overflow-x:auto;mask-image:none;-webkit-mask-image:none}.book-train-group[aria-hidden=true]{display:none}}
+
+/* Account activity indicator */
+.icon-button.account-link{position:relative}
+.notification-count{position:absolute;top:-3px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#1d4ed8;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center}

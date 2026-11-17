@@ -44,3 +44,8 @@ See `OWNER_SETUP.md` for Google provider/redirect configuration and the final pa
 ## Validation
 
 `npm run check` and `npm test` cover syntax, signature verification, payment reconciliation, duplicate processing, role escalation, cross-author access, unconfirmed email and unpaid/revoked access. A database transaction test verifies entitlement/ledger idempotency and withdrawal reservations, then rolls back all test records. Passing these checks is not a claim that a live Snippe charge or Google OAuth round trip has been completed.
+
+
+## Author activity communications
+
+Confirmed sales create an in-app notification for the book's author and trigger an idempotent author sales email when Resend is configured. Moderation decisions also trigger author emails. Author verification SMS is sent only after an invited, email-verified account accepts the invitation and becomes an active author; it is gated by `EHUB_AUTHOR_VERIFICATION_SMS_ENABLED=true`. Customer purchase SMS is not used. The optional `SUPABASE_AUTH_URL` setting lets the browser use a Supabase custom Auth domain after it has been activated; until then it safely falls back to `SUPABASE_URL`.
