@@ -5,7 +5,8 @@ import {createProtectedReaderFile} from '../reader-protection.mjs';
 import {bookPage} from '../book-page.mjs';
 import {storefrontPage,sitemap} from '../seo.mjs';
 import {marketplace,currentUser,validatePublication,publicBook,entitled} from '../marketplace.mjs';
-import {receiveSms,paidSms} from '../communications.mjs';
+import {receiveSms} from '../communications.mjs';
+import {emailAuthorSale} from '../author-notifications.mjs';
 import {attachAffiliateOrder} from '../affiliates.mjs';
 
 const ok=(data,status=200)=>({statusCode:status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
@@ -143,7 +144,7 @@ async function handle(event){
               const paidOrder=await one('ebook_orders',eq('id',order.id));
               await emailAccess(paidOrder);
             }
-            if(verified==='completed')await paidSms(await one('ebook_orders',eq('id',order.id)));
+            if(verified==='completed')await emailAuthorSale(await one('ebook_orders',eq('id',order.id)));
           } catch(error){
             // An outage or pending API response must never invent a paid state.
             console.error('Snippe verification unavailable',error?.status||'provider_error');
@@ -186,7 +187,7 @@ async function handle(event){
     if(verified==='completed'){
       const order=await one('ebook_orders',eq('id',payment.order_id));
       const sent=await emailAccess(order);
-      await paidSms(order);
+      await emailAuthorSale(order);
       if(process.env.RESEND_API_KEY&&process.env.EMAIL_FROM&&!sent)
         throw new HttpError(503,'Email delivery retry required');
     }
@@ -306,6 +307,7 @@ async function handle(event){
       if(status==='completed'){
         const order=await one('ebook_orders',eq('id',p.order_id));
         await emailAccess(order);
+        await emailAuthorSale(order);
       }
       return ok({status});
     }
