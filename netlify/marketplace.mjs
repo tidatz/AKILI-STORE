@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import {uploadKinds,storedBytes,pdfFiles,verifyCover} from './publication.mjs';
 import {appearance,publicAuthorLink,experienceAction,experienceReady} from './experience.mjs';
 import {HttpError,clean,isUuid,sha,randomToken,supa,rows,one,insert,patch,eq,assetUrl,signFile,adminUser} from './lib.mjs';
+import {createProtectedReaderFile} from './reader-protection.mjs';
 import {smsConfigured,emailConfigured,invitationEmailConfigured,bulkValues,sendBulk,smsAccount,connectSmsApi,connectSmsWebhook,emailInvitation,siteOrigin} from './communications.mjs';
 import {smsConfig,smsStatus} from './sms-config.mjs';
 import {affiliateAction,affiliateReady,publicAffiliateVisit} from './affiliates.mjs';
@@ -127,10 +128,16 @@ export async function marketplace(event,action){
  if(action==='market-access'&&method==='POST'){
    const a=await entitled(u,b.bookId),book=await one('ebook_books',eq('id',a.book_id));
    if(!book?.pdf_path)throw new HttpError(404,'PDF haipatikani. Tafadhali wasiliana na msaada.');
-   const progress=await one('akili_reading_progress',eq('user_id',u.id)+'&'+eq('book_id',book.id));
-   if(a.order_id)await insert('ebook_access_events',{order_id:a.order_id,event_type:b.purpose==='download'?'download_request':'reader_open'});
-   else await audit(u,b.purpose==='download'?'access.download':'access.read',book.id);
-   return {title:book.title,url:await signFile('ebook-pdfs',book.pdf_path,300),filename:book.slug+'.pdf',slug:book.slug,page:progress?.page||1,appearance:{}};
+   if(b.purpose==='download')throw new HttpError(403,'Upakuaji wa PDF asili umezimwa. Soma nakala yenye alama ya ulinzi ndani ya AKILI STORE.');
+   if(b.purpose&&b.purpose!=='read')throw new HttpError(400,'Aina ya usomaji si sahihi.');
+   const [progress,order]=await Promise.all([
+     one('akili_reading_progress',eq('user_id',u.id)+'&'+eq('book_id',book.id)),
+     a.order_id?one('ebook_orders',eq('id',a.order_id)):Promise.resolve(null)
+   ]);
+   const protectedFile=await createProtectedReaderFile({book,order,user:u});
+   if(a.order_id)await insert('ebook_access_events',{order_id:a.order_id,user_id:u.id,event_type:'reader_open',watermark_ref:protectedFile.reference});
+   else await audit(u,'access.read',book.id,{watermark_ref:protectedFile.reference});
+   return {title:book.title,url:protectedFile.url,slug:book.slug,page:progress?.page||1,protected:true,watermark_ref:protectedFile.reference,appearance:{}};
  }
  if(action==='market-progress'&&method==='POST'){
    await entitled(u,b.bookId);
