@@ -19,8 +19,7 @@ function updateButtons(){
   $('#next').disabled=!ready||page>=pdf.numPages;
   $('#zoom-in').disabled=!ready||zoom>=2.5;
   $('#zoom-out').disabled=!ready||zoom<=.5;
-  $('#download').disabled=!details;
-  $('#open-pdf').disabled=!details;
+
   $('#share-book').disabled=!details?.slug;
   $('#pages').textContent=ready?page+' / '+pdf.numPages:'— / —';
   $('#zoom-label').textContent=Math.round(zoom*100)+'%';
@@ -52,26 +51,6 @@ $('#prev').onclick=()=>{if(page>1){page--;render()}};
 $('#next').onclick=()=>{if(pdf&&page<pdf.numPages){page++;render()}};
 $('#zoom-in').onclick=()=>{zoom=Math.min(2.5,Math.round((zoom+.25)*100)/100);render()};
 $('#zoom-out').onclick=()=>{zoom=Math.max(.5,Math.round((zoom-.25)*100)/100);render()};
-$('#download').onclick=async()=>{
-  $('#download').disabled=true;
-  try{
-    const data=await request('download');
-    const result=await fetch(data.url,{signal:AbortSignal.timeout(30000)});
-    if(!result.ok)throw Error('PDF haikupakuliwa.');
-    const blob=await result.blob();
-    const url=URL.createObjectURL(blob);
-    const anchor=document.createElement('a');anchor.href=url;anchor.download=data.filename||'kitabu.pdf';
-    document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
-  }catch(e){message(e.message)}
-  finally{updateButtons()}
-};
-$('#share-book').onclick=async()=>{try{const r=await shareBook(details);if(r.cancelled)return;const el=$('#share-message');el.hidden=false;el.textContent=r.copied?'Link ya kitabu imenakiliwa.':r.shared?'Kitabu kimeshirikishwa.':r.url;}catch(e){message(e.message)}};
-$('#open-pdf').onclick=async()=>{
-  $('#open-pdf').disabled=true;
-  try{const data=await request('read');location.assign(data.url);}
-  catch(e){message(e.message||'PDF haijafunguka. Jaribu tena.');}
-  finally{updateButtons();}
-};
 let resize;window.addEventListener('resize',()=>{clearTimeout(resize);resize=setTimeout(render,200)});
 async function openBook(){
   $('#retry-reader').hidden=true;
@@ -88,7 +67,7 @@ async function openBook(){
     updateButtons();await render();
   }catch(e){
     if(e.status===401){message('Ingia kwa akaunti uliyotumia kununua kitabu.');const login=$('#reader-login');login.href='/login?next='+encodeURIComponent(location.pathname+location.search);login.hidden=false;}
-    else message(details?'Msomaji hajafunguka. Tumia “Fungua PDF” au kitufe cha kupakua.':e.message||'Imeshindikana kufungua PDF.');
+    else message(details?'Msomaji hajafunguka. Jaribu tena au wasiliana na msaada.':e.message||'Imeshindikana kufungua PDF.');
     $('#retry-reader').hidden=false;updateButtons();
   }
 }

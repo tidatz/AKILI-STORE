@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {experienceReady} from '../experience.mjs';
 import {HttpError,sha,randomToken,isUuid,clean,supa,rows,insert,patch,remove,eq,one,assetUrl,signFile,adminUser,snippe,verifyWebhook,applyPayment,generateAccess,emailAccess} from '../lib.mjs';
+import {createProtectedReaderFile} from '../reader-protection.mjs';
 import {bookPage} from '../book-page.mjs';
 import {storefrontPage,sitemap} from '../seo.mjs';
 import {marketplace,currentUser,validatePublication,publicBook,entitled} from '../marketplace.mjs';
@@ -202,10 +203,11 @@ async function handle(event){
     await checkBoundOrder(order);
     const book=await one('ebook_books',eq('id',order.book_id));
     if(!book?.pdf_path)throw new HttpError(404,'PDF haipo.');
-    const isDownload=b.purpose==='download';
-    if(b.purpose&&!['download','read'].includes(b.purpose))throw new HttpError(400,'Invalid purpose');
-    await insert('ebook_access_events',{order_id:order.id,event_type:isDownload?'download_request':'reader_open'});
-    return ok({title:book.title,url:await signFile('ebook-pdfs',book.pdf_path,900),filename:book.slug+'.pdf',slug:book.slug});
+    if(b.purpose==='download')throw new HttpError(403,'Upakuaji wa PDF asili umezimwa. Soma nakala yenye alama ya ulinzi ndani ya AKILI STORE.');
+    if(b.purpose&&b.purpose!=='read')throw new HttpError(400,'Aina ya usomaji si sahihi.');
+    const protectedFile=await createProtectedReaderFile({book,order});
+    await insert('ebook_access_events',{order_id:order.id,event_type:'reader_open'});
+    return ok({title:book.title,url:protectedFile.url,slug:book.slug,protected:true,watermark_ref:protectedFile.reference});
   }
   if(action.startsWith('admin-')){
     await adminUser(event);

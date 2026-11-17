@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import app from '../api/index.js';
+import {PDFDocument} from 'pdf-lib';
 import {sha} from '../netlify/lib.mjs';
 import {appearance} from '../netlify/experience.mjs';
 import {publicBookLink,shareBook} from '../public/share.js';
 const actor='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222',bookId='33333333-3333-4333-8333-333333333333',orderId='44444444-4444-4444-8444-444444444444';
 const secret='a'.repeat(64),token='b'.repeat(64);
+const readerSource=await PDFDocument.create();readerSource.addPage();const readerPdf=await readerSource.save();
 const json=(v,status=200)=>new Response(JSON.stringify(v),{status,headers:{'Content-Type':'application/json'}});
 const req=(a,b,auth=true)=>app.fetch(new Request('https://store.test/api?action='+a,{method:b?'POST':'GET',headers:{...(auth?{Authorization:'Bearer qa'}:{}),...(b?{'Content-Type':'application/json'}:{})},...(b?{body:JSON.stringify(b)}:{})}));
 async function fixture(run,{admin=false,manual=false,paid=false,owner=null,revoked=false,deleted=false,restricted=false,overrides={}}={}){
@@ -21,7 +23,9 @@ async function fixture(run,{admin=false,manual=false,paid=false,owner=null,revok
    else if(path==='/rest/v1/ebook_orders')data=[{id:orderId,user_id:owner,book_id:bookId,status:paid?'paid':'pending',checkout_secret_hash:sha(secret),customer_email:'guest@example.invalid',amount_tzs:500}];
    else if(path==='/rest/v1/ebook_books')data=[{id:bookId,title:'Title " & <Book>',slug:'kitabu-cha-maarifa',author_name:'QA',price_tzs:500,status:'published',cover_path:'cover.webp',pdf_path:'private/full.pdf',preview_path:'private/sample.pdf'}];
    else if(path==='/rest/v1/ebook_access_tokens')data=[{order_id:orderId,revoked_at:null,expires_at:'2099-01-01'}];
-   else if(path.startsWith('/storage/v1/object/sign/'))data={signedURL:'/object/sign/ebook-pdfs/private/full.pdf?token=mock-signed-only'};
+   else if(path.startsWith('/storage/v1/object/sign/')&&opts.method==='POST')data={signedURL:path.replace('/storage/v1','')+'?token=mock-signed-only'};
+   else if(path.startsWith('/storage/v1/object/sign/'))return new Response(readerPdf,{headers:{'Content-Type':'application/pdf'}});
+   else if(path.startsWith('/storage/v1/object/ebook-reader-cache/'))data={Key:path};
    else if(path.startsWith('/rest/v1/rpc/'))data=true;
    else data=[];
    return data instanceof Response?data:json(data);

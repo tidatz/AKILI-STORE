@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import app from '../api/index.js';
+import {PDFDocument} from 'pdf-lib';
 const uid='11111111-1111-4111-8111-111111111111';
 const other='22222222-2222-4222-8222-222222222222';
 const bookId='33333333-3333-4333-8333-333333333333';
+const readerSource=await PDFDocument.create();readerSource.addPage();const readerPdf=await readerSource.save();
 const originalFetch=global.fetch;
 const request=(action,body,token='reader-token')=>app.fetch(new Request('https://store.test/api?action='+action,{method:body?'POST':'GET',headers:{...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})}));
 async function mock(role,callback,overrides={}){
@@ -17,6 +19,9 @@ async function mock(role,callback,overrides={}){
   else if(url.pathname==='/rest/v1/ebook_admins')result=[];
   else if(url.pathname==='/rest/v1/ebook_books')result=[{id:bookId,author_id:other,title:'Existing book',slug:'existing-book',price_tzs:25000,status:'draft',pdf_path:'private/full.pdf',preview_path:'sample.pdf',cover_path:'cover.png'}];
   else if(url.pathname==='/rest/v1/ebook_site_settings')result=[{site_name:'AKILI STORE'}];
+  else if(url.pathname.startsWith('/storage/v1/object/sign/')&&opts.method==='POST')result={signedURL:url.pathname.replace('/storage/v1','')+'?token=mock'};
+  else if(url.pathname.startsWith('/storage/v1/object/sign/'))return new Response(readerPdf,{headers:{'Content-Type':'application/pdf'}});
+  else if(url.pathname.startsWith('/storage/v1/object/ebook-reader-cache/'))result={Key:url.pathname};
   else result=[];
   if(result instanceof Response)return result;
   return new Response(JSON.stringify(result),{status:200,headers:{'Content-Type':'application/json'}});
@@ -56,14 +61,13 @@ test('purchase confirmation cannot expose another buyer or an unpaid or revoked 
  await mock('reader',async()=>assert.equal((await request('market-purchase',{orderId:other})).status,403),{'/rest/v1/ebook_orders':()=>[{id:other,book_id:bookId,user_id:uid,status:'paid'}]});
  assert.equal((await request('market-purchase',{orderId:other},null)).status,401);
 });
-test('a paid buyer library contains the purchased book and authorizes a fresh read and download',async()=>mock('reader',async calls=>{
+test('a paid buyer library receives a personalized protected reader copy and cannot download the original',async()=>mock('reader',async calls=>{
  for(let i=0;i<2;i++){const r=await request('market-library');assert.equal(r.status,200);const lib=await r.json();assert.equal(lib.books[0].id,bookId);}
- for(const purpose of ['read','download']){
-  const r=await request('market-access',{bookId,purpose});assert.equal(r.status,200);const data=await r.json();
-  assert.ok(data.url.startsWith('https://database.test/storage/v1/object/sign/ebook-pdfs/'));assert.equal(data.filename,'existing-book.pdf');
- }
- assert.equal(calls.filter(c=>c.path.startsWith('/storage/v1/object/sign/')).length,2);
+ const r=await request('market-access',{bookId,purpose:'read'});assert.equal(r.status,200);const data=await r.json();
+ assert.ok(data.url.startsWith('https://database.test/storage/v1/object/sign/ebook-reader-cache/'));assert.equal(data.protected,true);assert.match(data.watermark_ref,/^AKS-/);
+ assert.equal((await request('market-access',{bookId,purpose:'download'})).status,403);
+ assert.equal(calls.some(c=>c.path.startsWith('/storage/v1/object/ebook-reader-cache/')),true);
 },{'/rest/v1/ebook_orders':()=>[{id:other,book_id:bookId,user_id:uid,status:'paid'}],'/rest/v1/akili_entitlements':(url,opts)=>{
  if(opts.method==='POST'&&url.searchParams.get('on_conflict')!=='user_id,book_id')return new Response(JSON.stringify({code:'23505',message:'duplicate key value violates unique constraint akili_entitlements_user_id_book_id_key'}),{status:409});
  return [{book_id:bookId,user_id:uid,order_id:other}];
-},'/storage/v1/object/sign/ebook-pdfs/private/full.pdf':()=>({signedURL:'/object/sign/ebook-pdfs/private/full.pdf?token=unit-test-only'})}));
+}}));

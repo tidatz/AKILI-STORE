@@ -33,7 +33,7 @@ Checkout uses the authenticated, confirmed buyer, database price and an idempote
 
 Sale allocations use the existing 60% author / 30% platform / 10% operations policy. Withdrawal requests reserve balance under a database lock. Minimum request TSh 10,000; fee TSh 2,000. The admin records a payout reference only after actual payout outside the application; clicking a status button does not transfer money.
 
-Full PDFs and sample PDFs use separate private buckets. Samples are validated before publication; the reader uses short-lived signed URLs and server-side access checks. Unpublished books stay available to existing entitled readers. Reviews require a purchase and admin moderation. Support and notifications use real saved records.
+Full PDFs, samples and per-reader protected copies use separate private buckets. Samples are validated before publication. The reader never receives the original PDF: the server creates a reader-specific copy with a repeated diagonal watermark and a masked-account footer plus a traceable AKS reference on every page. Only short-lived signed URLs to that protected copy are issued after server-side purchase/entitlement checks. Direct PDF download is disabled in the reader; screenshots and manual transcription cannot be technically prevented, but visible marks make redistributed pages attributable. Watermark references and reader opens are retained in the admin access audit. Unpublished books stay available to existing entitled readers. Reviews require a purchase and admin moderation. Support and notifications use real saved records.
 
 ## Environment and owner setup
 

@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import app from '../api/index.js';
+import {PDFDocument} from 'pdf-lib';
 const user='11111111-1111-4111-8111-111111111111',bookId='22222222-2222-4222-8222-222222222222',orderId='33333333-3333-4333-8333-333333333333';
+const readerSource=await PDFDocument.create();readerSource.addPage();const readerPdf=await readerSource.save();
 test('pending database approval leaves existing purchases, admin data and local appearance usable',async()=>{
  const original=global.fetch,env={SUPABASE_URL:'https://old-db.test',SUPABASE_SERVICE_ROLE_KEY:'server-test',SUPABASE_PUBLISHABLE_KEY:'public-test'},prev=Object.fromEntries(Object.keys(env).map(k=>[k,process.env[k]])),calls=[];Object.assign(process.env,env);
  global.fetch=async(input,opts={})=>{
@@ -16,7 +18,9 @@ test('pending database approval leaves existing purchases, admin data and local 
    if(u.pathname==='/rest/v1/ebook_books')value=[{id:bookId,slug:'existing-book',title:'Existing book',price_tzs:500,status:'published',pdf_path:'private.pdf',cover_path:'cover.webp'}];
    if(u.pathname==='/rest/v1/ebook_orders')value=[{id:orderId,user_id:user,book_id:bookId,status:'paid',amount_tzs:500}];
    if(u.pathname==='/rest/v1/akili_entitlements')value=[{user_id:user,book_id:bookId,order_id:orderId}];
-   if(u.pathname.startsWith('/storage/v1/object/sign/'))value={signedURL:'/object/sign/ebook-pdfs/private.pdf?token=mock'};
+   if(u.pathname.startsWith('/storage/v1/object/sign/')&&opts.method==='POST')value={signedURL:u.pathname.replace('/storage/v1','')+'?token=mock'};
+   if(u.pathname.startsWith('/storage/v1/object/ebook-reader-cache/'))value={Key:u.pathname};
+   if(u.pathname.startsWith('/storage/v1/object/sign/')&&opts.method!=='POST')return new Response(readerPdf,{headers:{'Content-Type':'application/pdf'}});
    return new Response(JSON.stringify(value),{headers:{'Content-Type':'application/json'}});
  };
  const request=(action,body)=>app.fetch(new Request('https://store.test/api?action='+action,{method:body?'POST':'GET',headers:{Authorization:'Bearer qa',...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})}));
