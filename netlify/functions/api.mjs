@@ -224,11 +224,13 @@ async function handle(event){
       const [books,settings,orders,payments,events]=await Promise.all([
         rows('ebook_books','select=*&order=created_at.desc'),
         one('ebook_site_settings','id=eq.1'),
-        rows('ebook_orders','select=id,book_id,customer_name,customer_email,customer_phone,amount_tzs,status,created_at,paid_at,email_sent_at&order=created_at.desc&limit=100'),
-        rows('ebook_payments','select=order_id,provider_reference,status,amount_tzs&order=created_at.desc&limit=100'),
+        rows('ebook_orders','select=id,book_id,customer_name,customer_email,customer_phone,amount_tzs,status,created_at,paid_at,email_sent_at,verification_test&order=created_at.desc&limit=500'),
+        rows('ebook_payments','select=order_id,provider_reference,status,amount_tzs,created_at&order=created_at.desc&limit=500'),
         rows('ebook_access_events','select=order_id,event_type,created_at&order=created_at.desc&limit=100')
       ]);
-      return ok({books,settings,orders,payments,events,
+      const attempts=new Map(payments.map(p=>[p.order_id,p]));
+      const customerOrders=orders.filter(o=>attempts.has(o.id)).map(o=>({...o,payment_status:attempts.get(o.id).status,payment_attempted_at:attempts.get(o.id).created_at}));
+      return ok({books,settings,orders:customerOrders,payments,events,
         status:{snippe:!!process.env.SNIPPE_API_KEY,webhook:!!process.env.SNIPPE_WEBHOOK_SECRET,payments_enabled:process.env.SNIPPE_PAYMENTS_ENABLED==='true',
           email:!!(process.env.RESEND_API_KEY&&process.env.EMAIL_FROM),storage:!!process.env.SUPABASE_SERVICE_ROLE_KEY}});
     }

@@ -174,8 +174,21 @@ export async function marketplace(event,action){
  if(action==='market-author-data'&&method==='GET'){
    authorizeAuthor(u);
    const [books,ledger,withdrawals,settings]=await Promise.all([rows('ebook_books','select=*&'+eq('author_id',u.id)+'&order=created_at.desc'),rows('akili_ledger','select=order_id,amount_tzs,created_at&account=eq.author&'+eq('author_id',u.id)+'&order=created_at.desc'),rows('akili_withdrawals','select=*&'+eq('user_id',u.id)+'&order=created_at.desc'),one('ebook_site_settings','id=eq.1','withdrawal_min_tzs,withdrawal_fee_tzs')]);
+   // Only expose buyers who actually reached the payment-provider attempt stage.
+   // Scope by this authenticated author's own book IDs before loading customer data.
+   const bookIds=books.map(x=>x.id);
+   let orders=[];
+   if(bookIds.length){
+     const candidates=await rows('ebook_orders','select=id,book_id,customer_name,customer_email,customer_phone,amount_tzs,currency,status,created_at,paid_at,verification_test&book_id=in.('+bookIds.join(',')+')&order=created_at.desc&limit=500');
+     const orderIds=candidates.map(x=>x.id);
+     if(orderIds.length){
+       const attempts=await rows('ebook_payments','select=order_id,status,created_at,updated_at&order_id=in.('+orderIds.join(',')+')&limit=500');
+       const attemptMap=new Map(attempts.map(x=>[x.order_id,x]));
+       orders=candidates.filter(x=>attemptMap.has(x.id)).map(x=>({...x,payment_status:attemptMap.get(x.id).status,payment_attempted_at:attemptMap.get(x.id).created_at}));
+     }
+   }
    const earned=ledger.reduce((s,x)=>s+x.amount_tzs,0),reserved=withdrawals.filter(x=>x.status!=='declined').reduce((s,x)=>s+x.amount_tzs,0);
-   return {books:books.map(x=>({...x,cover_url:assetUrl(x.cover_path)})),ledger,withdrawals,balance:{earned,available:earned-reserved,pending:withdrawals.filter(x=>x.status==='pending').reduce((s,x)=>s+x.amount_tzs,0),withdrawn:withdrawals.filter(x=>x.status==='paid').reduce((s,x)=>s+x.amount_tzs-x.fee_tzs,0)},policy:settings};
+   return {books:books.map(x=>({...x,cover_url:assetUrl(x.cover_path)})),orders,ledger,withdrawals,balance:{earned,available:earned-reserved,pending:withdrawals.filter(x=>x.status==='pending').reduce((s,x)=>s+x.amount_tzs,0),withdrawn:withdrawals.filter(x=>x.status==='paid').reduce((s,x)=>s+x.amount_tzs-x.fee_tzs,0)},policy:settings};
  }
  if(action==='market-save-book'&&method==='POST'){
    authorizeAuthor(u);const existing=b.id?await ownBook(u,b.id):null;
