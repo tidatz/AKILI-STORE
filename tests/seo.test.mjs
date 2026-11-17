@@ -19,9 +19,9 @@ test('sitemap refuses malformed slugs and never fabricates last-modification dat
  assert.ok(xml.includes('/book/real-book'));
 },{books:[{slug:'../private?token=secret',updated_at:'bad'},{slug:'<script>',updated_at:'bad'},{slug:'real-book',updated_at:null}]}));
 test('public storefront metadata is rendered on the server and has one canonical URL per page',async()=>fixture(async()=>{
- for(const [page,path]of [['home','/'],['books','/books'],['categories','/categories']]){
+ for(const [page,path,title]of [['home','/','AKILI STORE — Maarifa yanaanza hapa'],['books','/books','Vitabu vya Kidijitali | AKILI STORE'],['categories','/categories','Vitabu kwa Makundi | AKILI STORE']]){
   const r=await request('store-page&page='+page);assert.equal(r.status,200);const html=await r.text();
-  assert.ok(html.includes('<title>AKILI STORE</title>'));assert.ok(html.includes('rel="canonical" href="https://store.test'+path+'"'));
+  assert.ok(html.includes('<title>'+title+'</title>'));assert.ok(html.includes('rel="canonical" href="https://store.test'+path+'"'));
   assert.equal((html.match(/rel="canonical"/g)||[]).length,1);assert.ok(html.includes('property="og:image"'));assert.ok(html.includes('application/ld+json'));
   assert.equal(html.includes('server-test'),false);
  }
