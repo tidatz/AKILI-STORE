@@ -29,7 +29,7 @@ async function sendEmailOnce(key,recipient,subject,text){
 }
 
 export async function emailAuthorSale(order){
- if(!order||order.status!=='paid')return false;
+ if(!order||order.status!=='paid'||!emailReady())return false;
  const [book,ledger]=await Promise.all([
   one('ebook_books',eq('id',order.book_id),'id,title,author_id'),
   one('akili_ledger',eq('order_id',order.id)+'&account=eq.author','amount_tzs')
@@ -44,7 +44,7 @@ export async function emailAuthorSale(order){
 }
 
 export async function emailAuthorBookDecision(book,status,note=''){
- if(!book?.author_id)return false;
+ if(!book?.author_id||!emailReady())return false;
  const author=await one('akili_profiles',eq('user_id',book.author_id),'email,display_name');
  if(!author?.email)return false;
  const state={published:'kimeidhinishwa na kuchapishwa',changes_requested:'kinahitaji marekebisho',rejected:'hakijaidhinishwa',archived:'kimeondolewa dukani'}[status]||status;
