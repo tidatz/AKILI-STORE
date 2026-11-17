@@ -7,6 +7,7 @@ const $=s=>document.querySelector(s);
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>'TSh '+Number(n||0).toLocaleString('en-US');
 const date=s=>s?new Date(s).toLocaleDateString('sw-TZ',{day:'numeric',month:'short',year:'numeric'}):'—';
+const dateTime=s=>s?new Date(s).toLocaleString('sw-TZ',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
 const labels={draft:'Rasimu',submitted:'Tayari kuchapishwa',changes_requested:'Inahitaji marekebisho',published:'Imechapishwa',rejected:'Imekataliwa',archived:'Imehifadhiwa',paid:'Imelipwa',pending:'Inasubiri',failed:'Imeshindikana',expired:'Muda umeisha',active:'Hai',restricted:'Imesitishwa',declined:'Imekataliwa',open:'Linashughulikiwa',resolved:'Limejibiwa',reader:'Msomaji',author:'Mwandishi',admin:'Admin',accepted:'Imepokelewa',unknown:'Haijathibitishwa',submitting:'Inatumwa'};
 const badge=s=>`<span class="badge ${h(s)}">${h(labels[s]||s)}</span>`;
 const link=(url,label,cls='btn secondary',ico='')=>`<a href="${h(url)}" class="${cls}">${ico?icon(ico,17):''}${label}</a>`;
