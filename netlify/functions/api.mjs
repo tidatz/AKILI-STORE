@@ -40,7 +40,7 @@ async function handle(event){
   if(marketResult!==undefined)return ok(marketResult);
   if(action==='sms-webhook'&&method==='POST')return ok(await receiveSms(event));
   if(action==='config'&&method==='GET')return ok({
-    supabase_url:process.env.SUPABASE_URL||'',publishable_key:process.env.SUPABASE_PUBLISHABLE_KEY||''
+    supabase_url:process.env.SUPABASE_URL||'',auth_url:process.env.SUPABASE_AUTH_URL||process.env.SUPABASE_URL||'',publishable_key:process.env.SUPABASE_PUBLISHABLE_KEY||''
   });
   if(action==='site'&&method==='GET'){
     const [settings,books]=await Promise.all([
