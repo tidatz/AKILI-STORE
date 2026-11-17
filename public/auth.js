@@ -9,7 +9,7 @@ export async function config(){
 }
 async function auth(path,body,token){
  const c=await config();if(!c.supabase_url||!c.publishable_key)throw Error('Huduma ya akaunti haipatikani kwa sasa.');
- const r=await fetch(c.supabase_url+'/auth/v1/'+path,{signal:AbortSignal.timeout(15000),method:body?'POST':'GET',headers:{apikey:c.publishable_key,...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+ const r=await fetch((c.auth_url||c.supabase_url)+'/auth/v1/'+path,{signal:AbortSignal.timeout(15000),method:body?'POST':'GET',headers:{apikey:c.publishable_key,...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
  const j=await r.json().catch(()=>({}));if(!r.ok){const e=Error(j.error_description||j.msg||j.message||'Imeshindikana. Jaribu tena.');e.status=r.status;throw e;}return j;
 }
 export async function api(action,body,retry=true){
@@ -63,7 +63,7 @@ export async function googleLogin(next=''){
  const challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
  sessionStorage.setItem('akili-pkce',verifier);rememberNext(next);
  const params=new URLSearchParams({provider:'google',redirect_to:location.origin+'/auth/callback',code_challenge:challenge,code_challenge_method:'s256',prompt:'select_account'});
- location.assign(c.supabase_url+'/auth/v1/authorize?'+params);
+ location.assign((c.auth_url||c.supabase_url)+'/auth/v1/authorize?'+params);
 }
 export function safeNext(value){
  if(typeof value!=='string'||!value.startsWith('/')||value.startsWith('//')||/[\\\x00-\x20]/.test(value))return '/';
@@ -85,6 +85,6 @@ export async function callback(){
 export async function recover(email,next=''){rememberNext(next);return auth('recover?redirect_to='+encodeURIComponent(location.origin+'/auth/callback'),{email});}
 export async function changePassword(password){
  const c=await config(),s=session();if(!s)throw Error('Fungua kiungo kilichotumwa kwenye email yako kwanza.');
- const r=await fetch(c.supabase_url+'/auth/v1/user',{method:'PUT',headers:{apikey:c.publishable_key,Authorization:'Bearer '+s.access_token,'Content-Type':'application/json'},body:JSON.stringify({password})});
+ const r=await fetch((c.auth_url||c.supabase_url)+'/auth/v1/user',{method:'PUT',headers:{apikey:c.publishable_key,Authorization:'Bearer '+s.access_token,'Content-Type':'application/json'},body:JSON.stringify({password})});
  if(!r.ok)throw Error('Nenosiri halijabadilishwa. Fungua kiungo kipya kutoka email yako.');
 }
