@@ -30,9 +30,8 @@ async function sendEmailOnce(key,recipient,subject,text){
 
 export async function emailAuthorSale(order){
  if(!order||order.status!=='paid')return false;
- const [book,profile,ledger]=await Promise.all([
+ const [book,ledger]=await Promise.all([
   one('ebook_books',eq('id',order.book_id),'id,title,author_id'),
-  one('akili_profiles',eq('user_id',order.author_id||'00000000-0000-0000-0000-000000000000'),'email,display_name'),
   one('akili_ledger',eq('order_id',order.id)+'&account=eq.author','amount_tzs')
  ]);
  const authorId=book?.author_id;
