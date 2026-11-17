@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {experienceReady} from '../experience.mjs';
 import {HttpError,sha,randomToken,isUuid,clean,supa,rows,insert,patch,remove,eq,one,assetUrl,signFile,adminUser,snippe,verifyWebhook,applyPayment,generateAccess,emailAccess} from '../lib.mjs';
+import {createProtectedReaderFile} from '../reader-protection.mjs';
 import {bookPage} from '../book-page.mjs';
 import {storefrontPage,sitemap} from '../seo.mjs';
 import {marketplace,currentUser,validatePublication,publicBook,entitled} from '../marketplace.mjs';
@@ -202,10 +203,11 @@ async function handle(event){
     await checkBoundOrder(order);
     const book=await one('ebook_books',eq('id',order.book_id));
     if(!book?.pdf_path)throw new HttpError(404,'PDF haipo.');
-    const isDownload=b.purpose==='download';
-    if(b.purpose&&!['download','read'].includes(b.purpose))throw new HttpError(400,'Invalid purpose');
-    await insert('ebook_access_events',{order_id:order.id,event_type:isDownload?'download_request':'reader_open'});
-    return ok({title:book.title,url:await signFile('ebook-pdfs',book.pdf_path,900),filename:book.slug+'.pdf',slug:book.slug});
+    if(b.purpose==='download')throw new HttpError(403,'Upakuaji wa PDF asili umezimwa. Soma nakala yenye alama ya ulinzi ndani ya AKILI STORE.');
+    if(b.purpose&&b.purpose!=='read')throw new HttpError(400,'Aina ya usomaji si sahihi.');
+    const protectedFile=await createProtectedReaderFile({book,order});
+    await insert('ebook_access_events',{order_id:order.id,user_id:order.user_id||null,event_type:'reader_open',watermark_ref:protectedFile.reference});
+    return ok({title:book.title,url:protectedFile.url,slug:book.slug,protected:true,watermark_ref:protectedFile.reference});
   }
   if(action.startsWith('admin-')){
     await adminUser(event);
@@ -223,7 +225,7 @@ async function handle(event){
         one('ebook_site_settings','id=eq.1'),
         rows('ebook_orders','select=id,book_id,customer_name,customer_email,customer_phone,amount_tzs,status,created_at,paid_at,email_sent_at&order=created_at.desc&limit=100'),
         rows('ebook_payments','select=order_id,provider_reference,status,amount_tzs&order=created_at.desc&limit=100'),
-        rows('ebook_access_events','select=order_id,event_type,created_at&order=created_at.desc&limit=100')
+        rows('ebook_access_events','select=order_id,user_id,event_type,watermark_ref,created_at&order=created_at.desc&limit=100')
       ]);
       return ok({books,settings,orders,payments,events,
         status:{snippe:!!process.env.SNIPPE_API_KEY,webhook:!!process.env.SNIPPE_WEBHOOK_SECRET,payments_enabled:process.env.SNIPPE_PAYMENTS_ENABLED==='true',
