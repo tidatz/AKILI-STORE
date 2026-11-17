@@ -70,4 +70,4 @@ test('a paid buyer library receives a personalized protected reader copy and can
 },{'/rest/v1/ebook_orders':()=>[{id:other,book_id:bookId,user_id:uid,status:'paid'}],'/rest/v1/akili_entitlements':(url,opts)=>{
  if(opts.method==='POST'&&url.searchParams.get('on_conflict')!=='user_id,book_id')return new Response(JSON.stringify({code:'23505',message:'duplicate key value violates unique constraint akili_entitlements_user_id_book_id_key'}),{status:409});
  return [{book_id:bookId,user_id:uid,order_id:other}];
-}));
+}}));
