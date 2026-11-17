@@ -135,7 +135,7 @@ export async function marketplace(event,action){
      a.order_id?one('ebook_orders',eq('id',a.order_id)):Promise.resolve(null)
    ]);
    const protectedFile=await createProtectedReaderFile({book,order,user:u});
-   if(a.order_id)await insert('ebook_access_events',{order_id:a.order_id,user_id:u.id,event_type:'reader_open',watermark_ref:protectedFile.reference});
+   if(a.order_id)await insert('ebook_access_events',{order_id:a.order_id,event_type:'reader_open'});
    else await audit(u,'access.read',book.id,{watermark_ref:protectedFile.reference});
    return {title:book.title,url:protectedFile.url,slug:book.slug,page:progress?.page||1,protected:true,watermark_ref:protectedFile.reference,appearance:{}};
  }
