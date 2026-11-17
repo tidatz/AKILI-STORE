@@ -4,6 +4,7 @@ import {appearance,publicAuthorLink,experienceAction,experienceReady} from './ex
 import {HttpError,clean,isUuid,sha,randomToken,supa,rows,one,insert,patch,eq,assetUrl,signFile,adminUser} from './lib.mjs';
 import {createProtectedReaderFile} from './reader-protection.mjs';
 import {smsConfigured,emailConfigured,invitationEmailConfigured,bulkValues,sendBulk,smsAccount,connectSmsApi,connectSmsWebhook,emailInvitation,siteOrigin} from './communications.mjs';
+import {authorVerifiedSms,emailAuthorBookDecision} from './author-notifications.mjs';
 import {smsConfig,smsStatus} from './sms-config.mjs';
 import {affiliateAction,affiliateReady,publicAffiliateVisit} from './affiliates.mjs';
 
@@ -96,8 +97,9 @@ export async function marketplace(event,action){
  const affiliateResult=await affiliateAction(u,action,b,method);if(affiliateResult!==undefined)return affiliateResult;
  const experience=await experienceAction(u,action,b,method);if(experience!==undefined)return experience;
  if(action==='market-me'&&method==='GET'){
+   const [unread]=await Promise.all([rows('akili_notifications','select=id&'+eq('user_id',u.id)+'&read_at=is.null&limit=99')]);
    const pending=!u.isAdmin&&u.profile.role==='reader'?await one('akili_author_invitations',eq('email',u.email.toLowerCase())+'&accepted_at=is.null&expires_at=gt.'+encodeURIComponent(new Date().toISOString())+'&order=created_at.desc','id'):null;
-   return {user:{...safeUser(u),author_invitation:pending?.id||null}};
+   return {user:{...safeUser(u),author_invitation:pending?.id||null,unread_notifications:unread.length}};
  }
  if(action==='market-profile'&&method==='POST'){
    const display_name=clean(b.display_name,100);if(display_name.length<2)throw new HttpError(400,'Jaza jina lako.');
@@ -161,13 +163,13 @@ export async function marketplace(event,action){
  }
  if(action==='market-accept-invite'&&method==='POST'){
    if(!/^[a-f0-9]{64}$/.test(b.token||''))throw new HttpError(400,'Mwaliko si sahihi.');
-   await supa('/rest/v1/rpc/akili_accept_invitation',{method:'POST',body:{p_user_id:u.id,p_token_hash:sha(b.token)}});await audit(u,'author.accepted');return {accepted:true};
+   await supa('/rest/v1/rpc/akili_accept_invitation',{method:'POST',body:{p_user_id:u.id,p_token_hash:sha(b.token)}});await audit(u,'author.accepted');try{await authorVerifiedSms(u.id);}catch(error){console.error('Author verification SMS unavailable',error?.name||'provider_error');}return {accepted:true};
  }
  if(action==='market-accept-email-invite'&&method==='POST'){
    const invite=await one('akili_author_invitations',eq('id',uuid(b.id)));
    if(!invite||invite.email.toLowerCase()!==u.email.toLowerCase()||invite.accepted_at||Date.parse(invite.expires_at)<=Date.now())throw new HttpError(403,'Mwaliko huu haujaidhinishwa kwa email yako au umeisha.');
    await supa('/rest/v1/rpc/akili_accept_invitation',{method:'POST',body:{p_user_id:u.id,p_token_hash:invite.token_hash}});
-   await audit(u,'author.accepted',invite.id);return {accepted:true};
+   await audit(u,'author.accepted',invite.id);try{await authorVerifiedSms(u.id);}catch(error){console.error('Author verification SMS unavailable',error?.name||'provider_error');}return {accepted:true};
  }
  if(action==='market-author-data'&&method==='GET'){
    authorizeAuthor(u);
@@ -262,7 +264,7 @@ export async function marketplace(event,action){
    const verified=b.status==='published'?await validatePublication({...book,...changes}):null;
    await insert('akili_product_versions',{book_id:book.id,actor_id:u.id,snapshot:book});
    await patch('ebook_books',eq('id',book.id),{...changes,...verified,status:b.status,moderation_note:note,updated_at:new Date().toISOString()});
-   await audit(u,'book.'+b.status,book.id,{note});await notify(book.author_id,'Uamuzi kuhusu kitabu chako',book.title+' — '+(note||b.status),'/author/books');return {saved:true};
+   await audit(u,'book.'+b.status,book.id,{note});await notify(book.author_id,'Uamuzi kuhusu kitabu chako',book.title+' — '+(note||b.status),'/author/books');try{await emailAuthorBookDecision({...book,...changes,updated_at:new Date().toISOString()},b.status,note);}catch(error){console.error('Author book activity email unavailable',error?.name||'provider_error');}return {saved:true};
  }
  if(action==='market-admin-invite'&&method==='POST'){
    const email=clean(b.email,160).toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new HttpError(400,'Email si sahihi.');
