@@ -4,7 +4,7 @@ begin;
 
 alter table public.akili_ledger drop constraint if exists akili_ledger_account_check;
 alter table public.akili_ledger add constraint akili_ledger_account_check
-  check (account in ('author','platform','system','affiliate','author_adjustment','platform_adjustment','system_adjustment'));
+  check (account in ('author','platform','system','affiliate','author_adjustment','author_reversal','platform_adjustment','system_adjustment'));
 
 with paid as (
   select o.id as order_id, o.amount_tzs,
@@ -113,9 +113,12 @@ begin
     fee := 2000;
   end if;
 
-  select coalesce(sum(amount_tzs),0) into earned from public.akili_ledger
-    where ((account in ('author','author_adjustment') and author_id=p_user_id)
-       or (account='affiliate' and affiliate_id=affiliate_key and affiliate_key is not null));
+  select coalesce(sum(amount_tzs) filter (where account in ('author','author_adjustment')),0)
+       - coalesce(sum(amount_tzs) filter (where account='author_reversal'),0)
+       + coalesce(sum(amount_tzs) filter (where account='affiliate' and affiliate_id=affiliate_key and affiliate_key is not null),0)
+    into earned from public.akili_ledger
+    where (author_id=p_user_id and account in ('author','author_adjustment','author_reversal'))
+       or (account='affiliate' and affiliate_id=affiliate_key and affiliate_key is not null);
   select coalesce(sum(amount_tzs),0) into reserved from public.akili_withdrawals
     where user_id=p_user_id and status in ('pending','paid');
 
