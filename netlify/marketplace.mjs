@@ -92,8 +92,8 @@ export async function marketplace(event,action){
    return {reviews};
  }
  if(action==='author-link'&&method==='POST')return publicAuthorLink(body(event).token);
- if(action==='public-author'&&method==='GET'){
-   const slug=String(event.queryStringParameters?.slug||'').toLowerCase();
+ if(action==='public-author'&&['GET','POST'].includes(method)){
+   const slug=String(method==='POST'?body(event).slug:event.queryStringParameters?.slug||'').toLowerCase();
    if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||slug.length>100)throw new HttpError(404,'Mwandishi hakupatikana.');
    const authors=await rows('akili_profiles','select=user_id,display_name,bio,role,status,deleted_at&role=eq.author&status=eq.active&limit=1000');
    const author=authors.find(p=>!p.deleted_at&&String(p.display_name||'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')===slug);
