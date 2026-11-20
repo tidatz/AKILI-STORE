@@ -6,7 +6,7 @@ const migration = await readFile(new URL('../supabase/author_full_earnings.sql',
 const api = await readFile(new URL('../netlify/marketplace.mjs', import.meta.url), 'utf8');
 const ui = await readFile(new URL('../public/market.js', import.meta.url), 'utf8');
 
-test('verified book payments credit 100% of the paid amount to the author', () => {
+test('unattributed book payments credit 100% while affiliate sales split the actual sale price 90/10', () => {
   assert.match(migration, /values\s*\(o\.id,b\.author_id,'author',p_amount\)/i);
   assert.match(migration, /set author_percent=100/i);
   assert.match(migration, /author_adjustment/);
@@ -24,5 +24,5 @@ test('authors have one fixed TSh 2,000 withdrawal fee and no higher minimum', ()
 
 test('author dashboard clearly labels 100% sale earnings', () => {
   assert.match(ui, /Mapato yangu \(100%\)/);
-  assert.match(ui, /Unapata 100% ya bei ya kila kitabu/);
+  assert.match(ui, /Unapata 90% ya bei ya mauzo yaliyotokana na affiliate/);
 });
