@@ -1,21 +1,38 @@
--- Author earnings policy: 100% of each verified book sale; one fixed TSh 2,000 withdrawal fee.
--- Historical paid sales are adjusted to the full paid order amount. Existing withdrawal records remain untouched.
+-- Author earnings policy: 100% of verified book sales and one flat TSh 2,000 author withdrawal fee.
+-- The ledger is append-only. Historical allocations are balanced with explicit adjustment rows.
 begin;
 
-update public.akili_ledger l
-set amount_tzs = case
-  when l.account = 'author' then o.amount_tzs
-  when l.account in ('platform','system') then 0
-  else l.amount_tzs
-end
-from public.ebook_orders o
-where l.order_id = o.id
-  and o.status = 'paid'
-  and l.account in ('author','platform','system');
+alter table public.akili_ledger drop constraint if exists akili_ledger_account_check;
+alter table public.akili_ledger add constraint akili_ledger_account_check
+  check (account in ('author','platform','system','affiliate','author_adjustment','platform_adjustment','system_adjustment'));
 
-update public.ebook_site_settings
-set author_percent = 100
-where id = 1;
+with paid as (
+  select o.id as order_id, o.amount_tzs,
+    coalesce(sum(l.amount_tzs) filter (where l.account='author'),0)::bigint as author_paid,
+    coalesce(sum(l.amount_tzs) filter (where l.account='platform'),0)::bigint as platform_paid,
+    coalesce(sum(l.amount_tzs) filter (where l.account='system'),0)::bigint as system_paid,
+    coalesce(max(l.author_id) filter (where l.account='author'),b.author_id) as author_id
+  from public.ebook_orders o
+  join public.ebook_books b on b.id=o.book_id
+  left join public.akili_ledger l on l.order_id=o.id
+  where o.status='paid'
+  group by o.id,o.amount_tzs,b.author_id
+), adjustments as (
+  select order_id,author_id,'author_adjustment'::text as account,
+    (amount_tzs-author_paid)::integer as amount_tzs
+  from paid where author_id is not null and amount_tzs>author_paid
+  union all
+  select order_id,null,'platform_adjustment',
+    platform_paid::integer from paid where platform_paid>0
+  union all
+  select order_id,null,'system_adjustment',
+    system_paid::integer from paid where system_paid>0
+)
+insert into public.akili_ledger(order_id,author_id,account,amount_tzs)
+select order_id,author_id,account,amount_tzs from adjustments
+on conflict(order_id,account) do nothing;
+
+update public.ebook_site_settings set author_percent=100 where id=1;
 
 create or replace function public.ebook_apply_payment_event(
   p_event_id text, p_reference text, p_order_id uuid, p_status text,
@@ -42,7 +59,7 @@ begin
   if p_status='completed' then
     update public.ebook_orders set status='paid',paid_at=coalesce(paid_at,now()) where id=o.id;
     select * into b from public.ebook_books where id=o.book_id;
-    -- The author receives the complete verified order amount. Platform absorbs operating/provider costs.
+    -- Every verified book sale is credited in full to its author. Operating costs are absorbed by the platform.
     insert into public.akili_ledger(order_id,author_id,account,amount_tzs) values
       (o.id,b.author_id,'author',p_amount),
       (o.id,null,'system',0),
@@ -91,14 +108,14 @@ begin
   select withdrawal_min_tzs,withdrawal_fee_tzs
     into minimum,fee from public.ebook_site_settings where id=1;
   if author_account then
-    -- No percentage or variable deductions: one flat fee per author withdrawal.
+    -- One fixed author fee, with no percentage deduction and no TSh 10,000 minimum.
     minimum := 2001;
     fee := 2000;
   end if;
 
   select coalesce(sum(amount_tzs),0) into earned from public.akili_ledger
-    where (account='author' and author_id=p_user_id)
-       or (account='affiliate' and affiliate_id=affiliate_key and affiliate_key is not null);
+    where ((account in ('author','author_adjustment') and author_id=p_user_id)
+       or (account='affiliate' and affiliate_id=affiliate_key and affiliate_key is not null));
   select coalesce(sum(amount_tzs),0) into reserved from public.akili_withdrawals
     where user_id=p_user_id and status in ('pending','paid');
 
