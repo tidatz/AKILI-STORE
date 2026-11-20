@@ -8,9 +8,11 @@ const ui = await readFile(new URL('../public/market.js', import.meta.url), 'utf8
 
 test('verified book payments credit 100% of the paid amount to the author', () => {
   assert.match(migration, /values\s*\(o\.id,b\.author_id,'author',p_amount\)/i);
-  assert.match(migration, /\(o\.id,null,'system',0\)/i);
-  assert.match(migration, /\(o\.id,null,'platform',0\)/i);
-  assert.match(migration, /set author_percent = 100/i);
+  assert.match(migration, /set author_percent=100/i);
+  assert.match(migration, /author_adjustment/);
+  assert.match(migration, /platform_adjustment/);
+  assert.match(migration, /system_adjustment/);
+  assert.match(api, /account=in\.\(author,author_adjustment\)/);
 });
 
 test('authors have one fixed TSh 2,000 withdrawal fee and no higher minimum', () => {
