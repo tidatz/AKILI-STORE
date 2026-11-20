@@ -46,10 +46,10 @@ test('public affiliate link creates a hashed click token without exposing its st
  const data=await r.json();assert.ok(data.token);assert.equal(data.expires_in_days,30);
  const click=calls.find(c=>c.path==='/rest/v1/akili_affiliate_clicks'&&c.opts.method==='POST');
  assert.ok(click);assert.notEqual(JSON.parse(click.opts.body).token_hash,data.token);
- assert.equal(JSON.parse(click.opts.body).commission_percent_of_platform,0);
+ assert.equal(JSON.parse(click.opts.body).commission_percent_of_platform,10);
 }));
 
-test('admin can configure a product commission as a percentage of platform share',async()=>withMock(async()=>{
+test('admin can configure a product commission as a percentage of actual book sale',async()=>withMock(async()=>{
  const r=await request('market-admin-affiliate-product-rule',{product_id:bookId,commission_percent_of_platform:25,active:true},'admin-token');
  assert.equal(r.status,200);const result=await r.json();assert.equal(result.saved,true);
 }, {}, true));
