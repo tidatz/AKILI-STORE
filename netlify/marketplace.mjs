@@ -245,7 +245,7 @@ export async function marketplace(event,action){
  }
  if(!action.startsWith('market-admin-'))throw new HttpError(404,'Huduma haijapatikana.');
  if(!u.isAdmin)throw new HttpError(403,'Huna ruhusa ya admin.');
- if(action==='market-admin-author-balance'&&method==='GET'){
+ if(action==='market-admin-author-balance'&&(method==='GET'||method==='POST')){
     const authorId=uuid(b.userId),profile=await one('akili_profiles',eq('user_id',authorId));
     if(!profile||profile.role!=='author')throw new HttpError(404,'Mwandishi hajapatikana.');
     const [ledger,withdrawals]=await Promise.all([
