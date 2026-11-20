@@ -173,8 +173,9 @@ export async function marketplace(event,action){
  }
  if(action==='market-author-data'&&method==='GET'){
    authorizeAuthor(u);
-   const [books,ledger,withdrawals,settings]=await Promise.all([rows('ebook_books','select=*&'+eq('author_id',u.id)+'&order=created_at.desc'),rows('akili_ledger','select=order_id,amount_tzs,created_at&account=eq.author&'+eq('author_id',u.id)+'&order=created_at.desc'),rows('akili_withdrawals','select=*&'+eq('user_id',u.id)+'&order=created_at.desc'),one('ebook_site_settings','id=eq.1','withdrawal_min_tzs,withdrawal_fee_tzs')]);
-   const earned=ledger.reduce((s,x)=>s+x.amount_tzs,0),reserved=withdrawals.filter(x=>x.status!=='declined').reduce((s,x)=>s+x.amount_tzs,0);
+   const [books,ledgerRows,withdrawals,settings]=await Promise.all([rows('ebook_books','select=*&'+eq('author_id',u.id)+'&order=created_at.desc'),rows('akili_ledger','select=order_id,amount_tzs,created_at&'+eq('author_id',u.id)+'&account=in.(author,author_adjustment)&order=created_at.desc'),rows('akili_withdrawals','select=*&'+eq('user_id',u.id)+'&order=created_at.desc'),one('ebook_site_settings','id=eq.1','withdrawal_min_tzs,withdrawal_fee_tzs')]);
+   const sales=new Map();for(const entry of ledgerRows){const prior=sales.get(entry.order_id);if(prior){prior.amount_tzs+=entry.amount_tzs;if(Date.parse(entry.created_at)<Date.parse(prior.created_at))prior.created_at=entry.created_at;}else sales.set(entry.order_id,{...entry});}
+   const ledger=[...sales.values()],earned=ledger.reduce((s,x)=>s+x.amount_tzs,0),reserved=withdrawals.filter(x=>x.status!=='declined').reduce((s,x)=>s+x.amount_tzs,0);
    return {books:books.map(x=>({...x,cover_url:assetUrl(x.cover_path)})),ledger,withdrawals,balance:{earned,available:earned-reserved,pending:withdrawals.filter(x=>x.status==='pending').reduce((s,x)=>s+x.amount_tzs,0),withdrawn:withdrawals.filter(x=>x.status==='paid').reduce((s,x)=>s+x.amount_tzs-x.fee_tzs,0)},policy:{...settings,withdrawal_min_tzs:2001,withdrawal_fee_tzs:2000}};
  }
  if(action==='market-save-book'&&method==='POST'){
