@@ -19,14 +19,14 @@ export async function publicAffiliateVisit(params,headers={}){
   if(!code)throw new HttpError(400,'Link ya affiliate si sahihi.');
   const affiliate=await one('akili_affiliates',eq('code',code));
   if(!affiliate||affiliate.status!=='active')throw new HttpError(404,'Link hii ya affiliate haipatikani.');
-  let campaign=null,productId=null,rate=0;
+  let campaign=null,productId=null,rate=10;
   if(params?.campaign){
     campaign=await one('akili_affiliate_campaigns',eq('code',safeCode(params.campaign)));
     const now=Date.now();
     if(!campaign||campaign.status!=='active'||Date.parse(campaign.starts_at)>now||
       campaign.ends_at&&Date.parse(campaign.ends_at)<=now)throw new HttpError(404,'Kampeni hii haipo au imefungwa.');
     if(campaign.product_id&&params.product&&campaign.product_id!==params.product)throw new HttpError(400,'Kampeni hii imefungwa kwa bidhaa maalumu.');
-    rate=Number(campaign.commission_percent_of_platform);
+    rate=Number(campaign.commission_percent_of_platform??10);
     productId=campaign.product_id||null;
   }
   if(params?.product){
@@ -37,7 +37,7 @@ export async function publicAffiliateVisit(params,headers={}){
   }
   if(!campaign&&productId){
     const rule=await one('akili_affiliate_product_rules',eq('product_id',productId)+'&active=eq.true');
-    rate=Number(rule?.commission_percent_of_platform||0);
+    rate=Number(rule?.commission_percent_of_platform??10);
   }
   const recent=await rows('akili_affiliate_clicks','select=id&'+eq('affiliate_id',affiliate.id)+'&created_at=gte.'+encodeURIComponent(new Date(Date.now()-5*60000).toISOString())+'&limit=50');
   if(recent.length>=50)throw new HttpError(429,'Link hii imetembelewa mara nyingi kwa muda mfupi. Jaribu baadaye.');
@@ -138,7 +138,7 @@ export async function affiliateAction(u,action,b,method){
   if(action==='market-admin-affiliate-campaign'&&method==='POST'){
     const name=clean(b.name,120),description=clean(b.description,1000);
     if(name.length<2)throw new HttpError(400,'Jina la kampeni linahitajika.');
-    const rate=pct(b.commission_percent_of_platform);
+    const rate=pct(b.commission_percent_of_platform??10);
     const productId=b.product_id?uuid(b.product_id):null;
     if(productId){const product=await one('ebook_books',eq('id',productId),'id,status');if(!product||product.status!=='published')throw new HttpError(400,'Chagua bidhaa iliyochapishwa.');}
     const starts=b.starts_at?new Date(b.starts_at):new Date(),ends=b.ends_at?new Date(b.ends_at):null;
@@ -150,7 +150,7 @@ export async function affiliateAction(u,action,b,method){
     return {campaign:result[0]};
   }
   if(action==='market-admin-affiliate-campaign-rate'&&method==='POST'){
-    const id=uuid(b.id),rate=pct(b.commission_percent_of_platform);
+    const id=uuid(b.id),rate=pct(b.commission_percent_of_platform??10);
     const result=await patch('akili_affiliate_campaigns',eq('id',id),{commission_percent_of_platform:rate,updated_at:new Date().toISOString()});
     if(!result.length)throw new HttpError(404,'Kampeni haijapatikana.');
     await insert('akili_audit_logs',{actor_id:u.id,action:'affiliate.campaign_rate_updated',target_id:id,details:{rate}});
@@ -165,7 +165,7 @@ export async function affiliateAction(u,action,b,method){
     return {saved:true};
   }
   if(action==='market-admin-affiliate-product-rule'&&method==='POST'){
-    const productId=uuid(b.product_id),rate=pct(b.commission_percent_of_platform),active=b.active!==false;
+    const productId=uuid(b.product_id),rate=pct(b.commission_percent_of_platform??10),active=b.active!==false;
     const product=await one('ebook_books',eq('id',productId),'id,status');if(!product||product.status!=='published')throw new HttpError(400,'Chagua bidhaa iliyochapishwa.');
     const existing=await one('akili_affiliate_product_rules',eq('product_id',productId));
     const values={commission_percent_of_platform:rate,active:!(b.active===false||b.active==='false'),updated_at:new Date().toISOString()};
