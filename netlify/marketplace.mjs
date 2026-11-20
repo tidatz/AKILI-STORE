@@ -173,9 +173,9 @@ export async function marketplace(event,action){
  }
  if(action==='market-author-data'&&method==='GET'){
    authorizeAuthor(u);
-   const [books,ledgerRows,withdrawals,settings]=await Promise.all([rows('ebook_books','select=*&'+eq('author_id',u.id)+'&order=created_at.desc'),rows('akili_ledger','select=order_id,amount_tzs,created_at&'+eq('author_id',u.id)+'&account=in.(author,author_adjustment)&order=created_at.desc'),rows('akili_withdrawals','select=*&'+eq('user_id',u.id)+'&order=created_at.desc'),one('ebook_site_settings','id=eq.1','withdrawal_min_tzs,withdrawal_fee_tzs')]);
+   const [books,ledgerRows,withdrawals,settings]=await Promise.all([rows('ebook_books','select=*&'+eq('author_id',u.id)+'&order=created_at.desc'),rows('akili_ledger','select=order_id,amount_tzs,created_at&'+eq('author_id',u.id)+'&account=in.(author,author_adjustment,author_reversal)&order=created_at.desc'),rows('akili_withdrawals','select=*&'+eq('user_id',u.id)+'&order=created_at.desc'),one('ebook_site_settings','id=eq.1','withdrawal_min_tzs,withdrawal_fee_tzs')]);
    const sales=new Map();for(const entry of ledgerRows){const prior=sales.get(entry.order_id);if(prior){prior.amount_tzs+=entry.amount_tzs;if(Date.parse(entry.created_at)<Date.parse(prior.created_at))prior.created_at=entry.created_at;}else sales.set(entry.order_id,{...entry});}
-   const ledger=[...sales.values()],earned=ledger.reduce((s,x)=>s+x.amount_tzs,0),reserved=withdrawals.filter(x=>x.status!=='declined').reduce((s,x)=>s+x.amount_tzs,0);
+   const ledger=[...sales.values()],earned=ledger.reduce((s,x)=>s+x.amount_tzs,0)-ledgerRows.filter(x=>x.account==='author_reversal').reduce((s,x)=>s+x.amount_tzs,0),reserved=withdrawals.filter(x=>x.status!=='declined').reduce((s,x)=>s+x.amount_tzs,0);
    return {books:books.map(x=>({...x,cover_url:assetUrl(x.cover_path)})),ledger,withdrawals,balance:{earned,available:earned-reserved,pending:withdrawals.filter(x=>x.status==='pending').reduce((s,x)=>s+x.amount_tzs,0),withdrawn:withdrawals.filter(x=>x.status==='paid').reduce((s,x)=>s+x.amount_tzs-x.fee_tzs,0)},policy:{...settings,withdrawal_min_tzs:2001,withdrawal_fee_tzs:2000}};
  }
  if(action==='market-save-book'&&method==='POST'){
@@ -245,6 +245,36 @@ export async function marketplace(event,action){
  }
  if(!action.startsWith('market-admin-'))throw new HttpError(404,'Huduma haijapatikana.');
  if(!u.isAdmin)throw new HttpError(403,'Huna ruhusa ya admin.');
+ if(action==='market-admin-author-balance'&&method==='GET'){
+    const authorId=uuid(b.userId),profile=await one('akili_profiles',eq('user_id',authorId));
+    if(!profile||profile.role!=='author')throw new HttpError(404,'Mwandishi hajapatikana.');
+    const [ledger,withdrawals]=await Promise.all([
+      rows('akili_ledger','select=account,amount_tzs&'+eq('author_id',authorId)+'&account=in.(author,author_adjustment,author_reversal)'),
+      rows('akili_withdrawals','select=amount_tzs,fee_tzs,status&'+eq('user_id',authorId))
+    ]);
+    const earned=ledger.reduce((s,x)=>s+(x.account==='author_reversal'?-x.amount_tzs:x.amount_tzs),0);
+    const reserved=withdrawals.filter(x=>['pending','paid'].includes(x.status)).reduce((s,x)=>s+x.amount_tzs,0);
+    return {author:{user_id:authorId,display_name:profile.display_name,email:profile.email},earned,available:earned-reserved,reserved,withdrawn:withdrawals.filter(x=>x.status==='paid').reduce((s,x)=>s+x.amount_tzs-x.fee_tzs,0)};
+  }
+  if(action==='market-admin-author-balance'&&method==='POST'){
+    const authorId=uuid(b.userId),target=Number(b.target_balance_tzs),reason=clean(b.reason,1000);
+    if(!Number.isSafeInteger(target)||target<0||target>2000000000||reason.length<8)throw new HttpError(400,'Weka salio sahihi na sababu yenye angalau herufi 8.');
+    const profile=await one('akili_profiles',eq('user_id',authorId));
+    if(!profile||profile.role!=='author')throw new HttpError(404,'Mwandishi hajapatikana.');
+    const [ledger,withdrawals]=await Promise.all([
+      rows('akili_ledger','select=account,amount_tzs&'+eq('author_id',authorId)+'&account=in.(author,author_adjustment,author_reversal)'),
+      rows('akili_withdrawals','select=amount_tzs,status&'+eq('user_id',authorId))
+    ]);
+    const current=ledger.reduce((s,x)=>s+(x.account==='author_reversal'?-x.amount_tzs:x.amount_tzs),0);
+    const reserved=withdrawals.filter(x=>['pending','paid'].includes(x.status)).reduce((s,x)=>s+x.amount_tzs,0);
+    if(target<reserved)throw new HttpError(409,'Salio jipya haliwezi kuwa chini ya fedha zilizokwishaombwa au kulipwa.');
+    const delta=target-current;
+    if(!delta)return {saved:true,unchanged:true,balance:current};
+    await insert('akili_ledger',{order_id:null,author_id:authorId,account:delta>0?'author_adjustment':'author_reversal',amount_tzs:Math.abs(delta)});
+    await audit(u,'author.balance_adjusted',authorId,{previous_balance_tzs:current,new_balance_tzs:target,delta_tzs:delta,reason});
+    await notify(authorId,'Salio lako limefanyiwa marekebisho',`Admin amebadilisha salio lako kwa TSh ${Math.abs(delta).toLocaleString('en-US')}. Sababu: ${reason}`,'/sales-analytics');
+    return {saved:true,balance:target,delta};
+  }
  if(action==='market-admin-data'&&method==='GET'){
    const [books,profiles,orders,withdrawals,tickets,reviews,audits,settings,ledger,invitations,admins,author_links]=await Promise.all([
      rows('ebook_books','select=*&order=created_at.desc'),rows('akili_profiles','select=*&order=created_at.desc&limit=300'),
