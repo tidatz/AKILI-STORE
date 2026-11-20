@@ -11,7 +11,7 @@ with paid as (
     coalesce(sum(l.amount_tzs) filter (where l.account='author'),0)::bigint as author_paid,
     coalesce(sum(l.amount_tzs) filter (where l.account='platform'),0)::bigint as platform_paid,
     coalesce(sum(l.amount_tzs) filter (where l.account='system'),0)::bigint as system_paid,
-    coalesce(max(l.author_id) filter (where l.account='author'),b.author_id) as author_id
+    coalesce((array_agg(l.author_id) filter (where l.account='author'))[1],b.author_id) as author_id
   from public.ebook_orders o
   join public.ebook_books b on b.id=o.book_id
   left join public.akili_ledger l on l.order_id=o.id
