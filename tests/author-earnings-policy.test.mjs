@@ -12,7 +12,7 @@ test('unattributed book payments credit 100% while affiliate sales split the act
   assert.match(migration, /author_adjustment/);
   assert.match(migration, /platform_adjustment/);
   assert.match(migration, /system_adjustment/);
-  assert.match(api, /account=in\.\(author,author_adjustment\)/);
+  assert.match(api, /account=in\.\(author,author_adjustment,author_reversal\)/);
 });
 
 test('authors have one fixed TSh 2,000 withdrawal fee and no higher minimum', () => {
