@@ -92,6 +92,15 @@ export async function marketplace(event,action){
    return {reviews};
  }
  if(action==='author-link'&&method==='POST')return publicAuthorLink(body(event).token);
+ if(action==='public-author'&&method==='GET'){
+   const slug=String(event.queryStringParameters?.slug||'').toLowerCase();
+   if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||slug.length>100)throw new HttpError(404,'Mwandishi hakupatikana.');
+   const authors=await rows('akili_profiles','select=user_id,display_name,bio,role,status,deleted_at&role=eq.author&status=eq.active&limit=1000');
+   const author=authors.find(p=>!p.deleted_at&&String(p.display_name||'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')===slug);
+   if(!author)throw new HttpError(404,'Mwandishi hakupatikana.');
+   const books=await rows('ebook_books','select=*&'+eq('author_id',author.user_id)+'&status=eq.published&order=featured.desc,created_at.desc&limit=250');
+   return {author:{display_name:author.display_name,bio:author.bio||''},books:books.map(publicBook)};
+ }
  if(!action.startsWith('market-'))return undefined;
  const u=await currentUser(event),b=method==='POST'?body(event):{};
  const affiliateResult=await affiliateAction(u,action,b,method);if(affiliateResult!==undefined)return affiliateResult;
