@@ -27,7 +27,7 @@ const guestBook=id=>{if(me)return null;try{const r=JSON.parse(sessionStorage.get
 const ownedBook=id=>libraryData?.books.some(b=>b.id===id)||!!guestBook(id);
 const readPath=b=>guestBook(b.id)?'/reader.html?token='+guestBook(b.id).token:'/reader.html?book='+b.id;
 const bookPath=b=>'/book/'+encodeURIComponent(b.slug);
-const authorSlug=name=>String(name||'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const authorSlug=name=>String(name||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const authorPath=name=>'/authors/'+encodeURIComponent(authorSlug(name));
 
 const checkoutPath=b=>'/checkout/'+encodeURIComponent(b.slug);
